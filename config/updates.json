@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Kaydet butonu uste alindi",
+    "summary": "Ayarlar icin Kaydet en ustte ve kayit sonrasi bildirim var.",
+    "details": [
+      "Kaydet basarili olunca 'Kaydedildi' mesaji gorunur.",
+      "Buton daha kolay ulasilir hale geldi."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Ayarlar sayfasinda tek kaydet duzeni",
     "summary": "Admin token ve otomasyon dahil tum degisiklikler tek Kaydet ile kaydedilir.",
     "details": [

@@ -1009,6 +1009,8 @@ function bindCalibrationButtons() {
 }
 
 function saveSettings() {
+  const savedNote = document.getElementById('settingsSavedNote');
+  if (savedNote) savedNote.textContent = '';
   const tokenInput = document.getElementById('adminTokenInput');
   if (tokenInput) {
     const value = tokenInput.value.trim();
@@ -1131,8 +1133,10 @@ function saveSettings() {
     if (!r.ok) {
       const msg = body.error || 'Ayar kaydi basarisiz.';
       alert(msg);
+      if (savedNote) savedNote.textContent = '';
       return;
     }
+    if (savedNote) savedNote.textContent = 'Kaydedildi';
     poll();
   });
 }
