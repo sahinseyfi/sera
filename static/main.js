@@ -815,6 +815,22 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
   ctx.fillText(formatMetricValue(midVal, metric), pad - 10, yMid);
   ctx.fillText(formatMetricValue(minVal, metric), pad - 10, yBot);
 
+  const timeLabelY = pad + plotH + 8;
+  const timeLabelColor = '#64748b';
+  ctx.fillStyle = timeLabelColor;
+  ctx.textBaseline = 'top';
+  if (points.length >= 2) {
+    const firstTs = points[0][0];
+    const midTs = points[Math.floor(points.length / 2)][0];
+    const lastTs = points[points.length - 1][0];
+    ctx.textAlign = 'left';
+    ctx.fillText(formatUnixSeconds(firstTs), pad, timeLabelY);
+    ctx.textAlign = 'center';
+    ctx.fillText(formatUnixSeconds(midTs), pad + plotW / 2, timeLabelY);
+    ctx.textAlign = 'right';
+    ctx.fillText(formatUnixSeconds(lastTs), pad + plotW, timeLabelY);
+  }
+
   if (points.length < 2) {
     const value = Number(points[0][1]);
     const x = pad + plotW;
@@ -828,6 +844,12 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(formatMetricValue(value, metric), x + 6, y);
+    const ts = points[0][0];
+    ctx.fillStyle = timeLabelColor;
+    ctx.font = labelFont;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText(formatUnixSeconds(ts), pad + plotW, timeLabelY);
     return;
   }
 

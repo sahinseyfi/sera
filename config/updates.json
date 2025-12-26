@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Grafik alti saat etiketleri eklendi",
+    "summary": "Grafiklerde alt kisimda zaman etiketleri gorunur hale geldi.",
+    "details": [
+      "Baslangic, orta ve bitis saatleri grafikte alt tarafta yer alir.",
+      "Degerleri yorumlamak ve zaman araligini gormek kolaylasti."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "LCD adresi 0x3F olarak ayarlandi",
     "summary": "20x4 I2C LCD modulin dogru adresle calismasi icin varsayilan adresi guncelledim.",
     "details": [
