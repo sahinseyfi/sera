@@ -1728,10 +1728,12 @@ def _energy_summary() -> Dict[str, Any]:
         "window_24h": "-24 hours",
         "window_7d": "-7 days",
     }
-    summary: Dict[str, Any] = {"unit": "Wh", "only_timed": True}
+    base_power_w = _coerce_float(os.getenv("PI_BASE_POWER_W", "5.0")) or 0.0
+    summary: Dict[str, Any] = {"unit": "Wh", "only_timed": True, "base_power_w": base_power_w}
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     for key, window in windows.items():
+        window_hours = 24 if key == "window_24h" else 7 * 24
         cur.execute(
             """
             SELECT name, SUM(seconds) FROM actuator_log
@@ -1745,6 +1747,16 @@ def _energy_summary() -> Dict[str, Any]:
         rows = cur.fetchall()
         total_wh = 0.0
         channels: Dict[str, Any] = {}
+        if base_power_w > 0:
+            base_energy = base_power_w * window_hours
+            channels["PI_BASE"] = {
+                "seconds": window_hours * 3600,
+                "power_w": base_power_w,
+                "quantity": 1,
+                "voltage_v": 5.0,
+                "energy_wh": round(base_energy, 3),
+            }
+            total_wh += base_energy
         for name, seconds in rows:
             if name is None:
                 continue
