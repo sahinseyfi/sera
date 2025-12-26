@@ -1006,14 +1006,6 @@ window.initSettings = function() {
   poll();
   state.poller = setInterval(poll, 2500);
   document.getElementById('saveSettings').onclick = saveSettings;
-  const saveTop = document.getElementById('saveSettingsTop');
-  if (saveTop) saveTop.onclick = saveSettings;
-  const safeToggle = document.getElementById('safeModeToggle');
-  if (safeToggle) {
-    safeToggle.onchange = () => {
-      saveSettings();
-    };
-  }
   initAdminToken();
   bindCalibrationButtons();
 };

@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Ayarlar icin tek kaydet butonu birakildi",
+    "summary": "Tum ayarlar tek Kaydet dugmesiyle kaydedilir hale geldi.",
+    "details": [
+      "SAFE MODE dahil tum degisiklikler alttaki tek butonla kaydedilir.",
+      "Otomatik kaydetme kapatildi."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Ayarlar icin kaydet butonu belirginlestirildi",
     "summary": "SAFE MODE ve diger ayarlar icin ustte de Kaydet butonu var.",
     "details": [
