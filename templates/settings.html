@@ -104,6 +104,25 @@
 </div></div>
 
 <div class="card mt-3"><div class="card-body">
+  <h6>Enerji Bedeli (TL/kWh)</h6>
+  <div class="row g-2">
+    <div class="col-md-4">
+      <label class="form-label">Düşük Kademe</label>
+      <input class="form-control" id="energyKwhLow" type="number" step="0.001" value="2.330">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Yüksek Kademe</label>
+      <input class="form-control" id="energyKwhHigh" type="number" step="0.001" value="3.451">
+    </div>
+    <div class="col-md-4">
+      <label class="form-label">Kademe Eşiği (kWh)</label>
+      <input class="form-control" id="energyKwhThreshold" type="number" step="1" value="240">
+    </div>
+  </div>
+  <div class="form-text">Toplam tüketim eşiği aştığında yüksek kademe uygulanır.</div>
+</div></div>
+
+<div class="card mt-3"><div class="card-body">
   <h6>Lux Otomasyonu</h6>
   <div class="row g-2">
     <div class="col-md-3">

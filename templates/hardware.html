@@ -33,6 +33,7 @@
           <th>Açıklama</th>
           <th>Güç (W)</th>
           <th>Adet</th>
+          <th>Toplam Güç</th>
           <th>Voltaj (V)</th>
           <th>Not</th>
         </tr>
@@ -41,6 +42,32 @@
     </table>
   </div>
   <small class="text-secondary">Kaydedince tüm kanallar güvenlik için OFF yapılır.</small>
+</div></div>
+
+<div class="card mt-3"><div class="card-body">
+  <h6 class="mb-2">Sensör Ayarları</h6>
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label class="form-label">DHT22 GPIO</label>
+      <input class="form-control" id="sensorDhtGpio" type="number" min="0" value="17">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">BH1750 Adres</label>
+      <input class="form-control" id="sensorBhAddr" placeholder="0x23">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">ADS1115 Adres</label>
+      <input class="form-control" id="sensorAdsAddr" placeholder="0x48">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">DS18B20</label>
+      <select class="form-select" id="sensorDsEnabled">
+        <option value="true">Açık</option>
+        <option value="false">Kapalı</option>
+      </select>
+    </div>
+  </div>
+  <div class="small text-secondary mt-2">Kaydet ile sensör ayarları anında uygulanır.</div>
 </div></div>
 
 <script>window.initHardware && window.initHardware();</script>

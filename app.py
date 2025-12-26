@@ -21,6 +21,7 @@ DATA_DIR = BASE_DIR / "data"
 TEST_PANEL_DIR = BASE_DIR / "sera_panel"
 DATA_DIR.mkdir(exist_ok=True)
 CHANNEL_CONFIG_PATH = CONFIG_DIR / "channels.json"
+SENSORS_CONFIG_PATH = CONFIG_DIR / "sensors.json"
 DB_PATH = DATA_DIR / "sera.db"
 SENSOR_CSV_LOG_DIR = DATA_DIR / "sensor_logs"
 
@@ -32,6 +33,9 @@ DEFAULT_LIMITS = {
     "pump_cooldown_seconds": 60,
     "heater_max_seconds": 300,
     "heater_cutoff_temp": 30,
+    "energy_kwh_low": 2.330,
+    "energy_kwh_high": 3.451,
+    "energy_kwh_threshold": 240,
 }
 DEFAULT_ALERTS = {
     "sensor_offline_minutes": 5,
@@ -263,7 +267,13 @@ class SensorManager:
         self.dht22_history: Deque[Tuple[float, float, float]] = deque()
         self.dht22_sensor = None
         self.ads_channels: List[Any] = []
+        self.config: Dict[str, Any] = {}
         # optional hardware libs
+        self._init_hardware()
+
+    def reload_config(self, config: Dict[str, Any]) -> None:
+        with self.lock:
+            self.config = dict(config)
         self._init_hardware()
 
     def _init_hardware(self) -> None:
@@ -273,6 +283,8 @@ class SensorManager:
         self.bus = None
         if self.simulation:
             return
+        config = dict(sensors_config)
+        config.update(self.config or {})
         try:
             import Adafruit_DHT  # type: ignore
 
@@ -283,7 +295,7 @@ class SensorManager:
             import adafruit_dht  # type: ignore
             import board  # type: ignore
 
-            gpio_pin = int(os.getenv("DHT22_GPIO", "17"))
+            gpio_pin = int(config.get("dht22_gpio", 17))
             pin_name = f"D{gpio_pin}"
             pin = getattr(board, pin_name, board.D17)
             self.dht22_sensor = adafruit_dht.DHT22(pin, use_pulseio=False)
@@ -307,8 +319,13 @@ class SensorManager:
             from adafruit_ads1x15.ads1115 import ADS1115  # type: ignore
             from adafruit_ads1x15.analog_in import AnalogIn  # type: ignore
 
+            addr_raw = config.get("ads1115_addr", "0x48")
+            try:
+                ads_addr = int(str(addr_raw), 0)
+            except Exception:
+                ads_addr = 0x48
             i2c = busio.I2C(board.SCL, board.SDA)
-            self.ads_adafruit = ADS1115(i2c, address=0x48)
+            self.ads_adafruit = ADS1115(i2c, address=ads_addr)
             self.ads_adafruit.gain = 1
             self.ads_channels = [
                 AnalogIn(self.ads_adafruit, 0),
@@ -401,7 +418,7 @@ class SensorManager:
                 "ts": time.time(),
                 "status": "unavailable",
             }
-        gpio_pin = int(os.getenv("DHT22_GPIO", "17"))
+        gpio_pin = int(self.config.get("dht22_gpio", 17) if self.config else sensors_config.get("dht22_gpio", 17))
         humidity, temperature = self.dht.read_retry(self.dht.DHT22, gpio_pin)
         return {
             "temperature": temperature,
@@ -411,6 +428,10 @@ class SensorManager:
         }
 
     def _read_ds18b20(self) -> Dict[str, Any]:
+        config = dict(sensors_config)
+        config.update(self.config or {})
+        if not config.get("ds18b20_enabled", True):
+            return {"temperature": None, "ts": time.time(), "status": "disabled"}
         if self.simulation:
             return {
                 "temperature": round(random.uniform(16, 25), 1),
@@ -439,7 +460,9 @@ class SensorManager:
                 "ts": time.time(),
                 "status": "simulated" if self.simulation else "unavailable",
             }
-        addr_env = os.getenv("BH1750_ADDR", "0x23")
+        config = dict(sensors_config)
+        config.update(self.config or {})
+        addr_env = str(config.get("bh1750_addr", "0x23"))
         try:
             primary_addr = int(addr_env, 0)
         except Exception:
@@ -474,12 +497,19 @@ class SensorManager:
                 "ts": time.time(),
                 "status": "simulated" if self.simulation else "unavailable",
             }
+        config = dict(sensors_config)
+        config.update(self.config or {})
+        addr_raw = config.get("ads1115_addr", "0x48")
+        try:
+            ads_addr = int(str(addr_raw), 0)
+        except Exception:
+            ads_addr = 0x48
         if self.bus:
             try:
-                ch0 = self._read_ads1115_raw(self.bus, 0)
-                ch1 = self._read_ads1115_raw(self.bus, 1)
-                ch2 = self._read_ads1115_raw(self.bus, 2)
-                ch3 = self._read_ads1115_raw(self.bus, 3)
+                ch0 = self._read_ads1115_raw(self.bus, ads_addr, 0)
+                ch1 = self._read_ads1115_raw(self.bus, ads_addr, 1)
+                ch2 = self._read_ads1115_raw(self.bus, ads_addr, 2)
+                ch3 = self._read_ads1115_raw(self.bus, ads_addr, 3)
                 return {
                     "ch0": ch0,
                     "ch1": ch1,
@@ -540,7 +570,7 @@ class SensorManager:
             }
 
     @staticmethod
-    def _read_ads1115_raw(bus: Any, channel: int) -> Optional[int]:
+    def _read_ads1115_raw(bus: Any, addr: int, channel: int) -> Optional[int]:
         if channel not in (0, 1, 2, 3):
             raise ValueError("ADS1115 channel must be 0-3")
         mux = 0x4 + channel
@@ -552,9 +582,9 @@ class SensorManager:
             | (0x4 << 5)  # 128 SPS
             | 0x0003  # disable comparator
         )
-        bus.write_i2c_block_data(0x48, 0x01, [(config >> 8) & 0xFF, config & 0xFF])
+        bus.write_i2c_block_data(addr, 0x01, [(config >> 8) & 0xFF, config & 0xFF])
         time.sleep(0.008)
-        data = bus.read_i2c_block_data(0x48, 0x00, 2)
+        data = bus.read_i2c_block_data(addr, 0x00, 2)
         raw = (data[0] << 8) | data[1]
         if raw & 0x8000:
             raw -= 1 << 16
@@ -1468,7 +1498,30 @@ def load_channel_config() -> List[Dict[str, Any]]:
     return normalize(default_channels)
 
 
+def load_sensors_config() -> Dict[str, Any]:
+    defaults = {
+        "dht22_gpio": int(os.getenv("DHT22_GPIO", "17")),
+        "bh1750_addr": os.getenv("BH1750_ADDR", "0x23"),
+        "ads1115_addr": "0x48",
+        "ds18b20_enabled": True,
+    }
+    if SENSORS_CONFIG_PATH.exists():
+        try:
+            with SENSORS_CONFIG_PATH.open() as f:
+                data = json.load(f)
+            merged = dict(defaults)
+            merged.update(data or {})
+            return merged
+        except Exception:
+            return defaults
+    CONFIG_DIR.mkdir(exist_ok=True)
+    with SENSORS_CONFIG_PATH.open("w") as f:
+        json.dump(defaults, f, indent=2)
+    return defaults
+
+
 channel_config = load_channel_config()
+sensors_config = load_sensors_config()
 actuator_manager = ActuatorManager(backend, channel_config)
 sensor_manager = SensorManager()
 automation_engine = AutomationEngine(actuator_manager, sensor_manager)
@@ -1752,6 +1805,24 @@ def _energy_summary() -> Dict[str, Any]:
             quantity = 0
         return power, quantity
 
+    def cost_try(total_wh: float) -> Dict[str, float]:
+        limits = app_state.limits
+        low = _coerce_float(limits.get("energy_kwh_low")) or 0.0
+        high = _coerce_float(limits.get("energy_kwh_high")) or 0.0
+        threshold = _coerce_float(limits.get("energy_kwh_threshold")) or 0.0
+        total_kwh = max(0.0, total_wh / 1000.0)
+        if threshold <= 0 or high <= 0:
+            return {"total_kwh": round(total_kwh, 3), "cost_try": round(total_kwh * low, 2)}
+        low_kwh = min(total_kwh, threshold)
+        high_kwh = max(0.0, total_kwh - threshold)
+        cost = (low_kwh * low) + (high_kwh * high)
+        return {
+            "total_kwh": round(total_kwh, 3),
+            "cost_try": round(cost, 2),
+            "low_kwh": round(low_kwh, 3),
+            "high_kwh": round(high_kwh, 3),
+        }
+
     windows = {
         "window_24h": "-24 hours",
         "window_7d": "-7 days",
@@ -1803,6 +1874,7 @@ def _energy_summary() -> Dict[str, Any]:
         summary[key] = {
             "total_wh": round(total_wh, 3),
             "channels": channels,
+            **cost_try(total_wh),
         }
     conn.close()
     return summary
@@ -2745,12 +2817,14 @@ def api_config() -> Any:
             "automation": automation_engine.config,
             "alerts_config": app_state.get_alerts_config(),
             "safe_mode": app_state.safe_mode,
+            "sensors": sensors_config,
         })
     payload = request.get_json(force=True, silent=True) or {}
     channels = payload.get("channels")
     limits = payload.get("limits")
     automation = payload.get("automation")
     alerts_config = payload.get("alerts")
+    sensors_payload = payload.get("sensors")
     safe_mode = payload.get("safe_mode")
     if channels:
         CONFIG_DIR.mkdir(exist_ok=True)
@@ -2763,6 +2837,12 @@ def api_config() -> Any:
         automation_engine.config.update(automation)
     if alerts_config:
         app_state.update_alerts(alerts_config)
+    if sensors_payload:
+        CONFIG_DIR.mkdir(exist_ok=True)
+        sensors_config.update(sensors_payload)
+        with SENSORS_CONFIG_PATH.open("w") as f:
+            json.dump(sensors_config, f, indent=2)
+        sensor_manager.reload_config(sensors_config)
     if safe_mode is not None:
         app_state.toggle_safe_mode(bool(safe_mode))
     actuator_manager.set_all_off("config_update")

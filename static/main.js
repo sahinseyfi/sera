@@ -78,6 +78,13 @@ function formatEnergy(wh) {
   return `${value.toFixed(1)} Wh`;
 }
 
+function formatCurrencyTry(value) {
+  if (value === null || value === undefined) return '--';
+  const num = Number(value);
+  if (Number.isNaN(num)) return '--';
+  return `${num.toFixed(2)} TL`;
+}
+
 function minutesRemaining(untilTs) {
   if (!untilTs) return 0;
   const diff = Number(untilTs) - (Date.now() / 1000);
@@ -439,6 +446,10 @@ window.renderDashboard = function(data) {
   const energyTotal7 = document.getElementById('energyTotal7d');
   if (energyTotal24) energyTotal24.textContent = formatEnergy(energy24.total_wh ?? 0);
   if (energyTotal7) energyTotal7.textContent = formatEnergy(energy7d.total_wh ?? 0);
+  const energyCost24 = document.getElementById('energyCost24h');
+  const energyCost7 = document.getElementById('energyCost7d');
+  if (energyCost24) energyCost24.textContent = formatCurrencyTry(energy24.cost_try ?? null);
+  if (energyCost7) energyCost7.textContent = formatCurrencyTry(energy7d.cost_try ?? null);
   const renderEnergyList = (containerId, channels) => {
     const wrap = document.getElementById(containerId);
     if (!wrap) return;
@@ -1023,6 +1034,9 @@ function saveSettings() {
       pump_cooldown_seconds: parseInt(document.getElementById('pumpCooldown').value, 10),
       heater_max_seconds: parseInt(document.getElementById('heaterMax').value, 10),
       heater_cutoff_temp: heaterCutoff,
+      energy_kwh_low: parseFloat(document.getElementById('energyKwhLow').value),
+      energy_kwh_high: parseFloat(document.getElementById('energyKwhHigh').value),
+      energy_kwh_threshold: parseFloat(document.getElementById('energyKwhThreshold').value),
     },
     automation: {
       enabled: document.getElementById('autoEnabled').value === 'true',
@@ -1100,6 +1114,9 @@ window.renderSettings = function(data) {
   document.getElementById('pumpCooldown').value = limits.pump_cooldown_seconds ?? 60;
   document.getElementById('heaterMax').value = limits.heater_max_seconds ?? 300;
   document.getElementById('heaterCutoff').value = limits.heater_cutoff_temp ?? 30;
+  document.getElementById('energyKwhLow').value = limits.energy_kwh_low ?? 2.330;
+  document.getElementById('energyKwhHigh').value = limits.energy_kwh_high ?? 3.451;
+  document.getElementById('energyKwhThreshold').value = limits.energy_kwh_threshold ?? 240;
   const auto = data.automation || {};
   document.getElementById('autoEnabled').value = auto.enabled ? 'true' : 'false';
   document.getElementById('luxOk').value = auto.lux_ok ?? 350;
@@ -1242,6 +1259,7 @@ window.initHardware = function() {
   if (refreshBtn) refreshBtn.onclick = poll;
   const saveBtn = document.getElementById('saveHardware');
   if (saveBtn) saveBtn.onclick = saveHardware;
+  fetchHardwareConfig();
 };
 
 window.renderHardware = function(data) {
@@ -1268,6 +1286,7 @@ window.renderHardware = function(data) {
   ];
   channels.forEach(ch => {
     const tr = document.createElement('tr');
+    const totalPower = (Number(ch.power_w || 0) * Number(ch.quantity || 1)) || 0;
     const roleSelect = `
       <select class="form-select form-select-sm" data-field="role">
         ${roleOptions.map(opt => `<option value="${opt.value}" ${opt.value === ch.role ? 'selected' : ''}>${opt.label}</option>`).join('')}
@@ -1281,6 +1300,7 @@ window.renderHardware = function(data) {
       <td><input class="form-control form-control-sm" data-field="description" value="${ch.description}"></td>
       <td><input class="form-control form-control-sm" data-field="power_w" type="number" step="0.1" value="${ch.power_w ?? ''}"></td>
       <td><input class="form-control form-control-sm" data-field="quantity" type="number" step="1" value="${ch.quantity ?? 1}"></td>
+      <td class="small text-secondary">${totalPower.toFixed(1)} W</td>
       <td><input class="form-control form-control-sm" data-field="voltage_v" type="number" step="0.1" value="${ch.voltage_v ?? ''}"></td>
       <td><input class="form-control form-control-sm" data-field="notes" value="${ch.notes ?? ''}"></td>`;
     body.appendChild(tr);
@@ -1321,8 +1341,38 @@ function saveHardware() {
   fetch('/api/config', {
     method: 'POST',
     headers: adminHeaders(),
-    body: JSON.stringify({ channels }),
+    body: JSON.stringify({ channels, sensors: collectSensorSettings() }),
   }).then(r => r.json()).then(() => poll());
+}
+
+function fetchHardwareConfig() {
+  fetch('/api/config', { headers: adminHeaders() })
+    .then(r => r.json())
+    .then(data => {
+      const sensors = data.sensors || {};
+      const dht = document.getElementById('sensorDhtGpio');
+      const bh = document.getElementById('sensorBhAddr');
+      const ads = document.getElementById('sensorAdsAddr');
+      const ds = document.getElementById('sensorDsEnabled');
+      if (dht) dht.value = sensors.dht22_gpio ?? 17;
+      if (bh) bh.value = sensors.bh1750_addr ?? '0x23';
+      if (ads) ads.value = sensors.ads1115_addr ?? '0x48';
+      if (ds) ds.value = sensors.ds18b20_enabled === false ? 'false' : 'true';
+    })
+    .catch(() => {});
+}
+
+function collectSensorSettings() {
+  const dht = document.getElementById('sensorDhtGpio');
+  const bh = document.getElementById('sensorBhAddr');
+  const ads = document.getElementById('sensorAdsAddr');
+  const ds = document.getElementById('sensorDsEnabled');
+  return {
+    dht22_gpio: dht ? parseInt(dht.value || '17', 10) : 17,
+    bh1750_addr: bh ? bh.value.trim() || '0x23' : '0x23',
+    ads1115_addr: ads ? ads.value.trim() || '0x48' : '0x48',
+    ds18b20_enabled: ds ? ds.value === 'true' : true,
+  };
 }
 
 function fmtMaybe(value, digits) {

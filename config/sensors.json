@@ -1,0 +1,6 @@
+{
+  "dht22_gpio": 17,
+  "bh1750_addr": "0x23",
+  "ads1115_addr": "0x48",
+  "ds18b20_enabled": true
+}
