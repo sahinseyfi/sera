@@ -1,8 +1,8 @@
 [
-  {"name": "R1_HEATER_FAN", "gpio_pin": 18, "active_low": true, "description": "Isıtıcı + Fan"},
-  {"name": "R2_FAN_MAIN", "gpio_pin": 23, "active_low": true, "description": "12cm Havalandırma Fanı"},
-  {"name": "R3_PUMP", "gpio_pin": 24, "active_low": true, "description": "Pompa"},
-  {"name": "R4_FAN_L3", "gpio_pin": 25, "active_low": true, "description": "3.kat Fanı"},
-  {"name": "R5_LIGHT_MID", "gpio_pin": 20, "active_low": true, "description": "3.kat Orta Işık"},
-  {"name": "R6_LIGHT_BACK", "gpio_pin": 21, "active_low": true, "description": "3.kat Arka Işık"}
+  {"name": "R1_HEATER_FAN", "gpio_pin": 18, "active_low": true, "description": "Isıtıcı + Fan", "role": "heater", "power_w": 0, "quantity": 1, "voltage_v": 12, "notes": ""},
+  {"name": "R2_FAN_MAIN", "gpio_pin": 23, "active_low": true, "description": "12cm Havalandırma Fanı", "role": "fan", "power_w": 0, "quantity": 1, "voltage_v": 12, "notes": ""},
+  {"name": "R3_PUMP", "gpio_pin": 24, "active_low": true, "description": "Pompa", "role": "pump", "power_w": 0, "quantity": 1, "voltage_v": 12, "notes": ""},
+  {"name": "R4_FAN_L3", "gpio_pin": 25, "active_low": true, "description": "3.kat Fanı", "role": "fan", "power_w": 0, "quantity": 1, "voltage_v": 12, "notes": ""},
+  {"name": "R5_LIGHT_MID", "gpio_pin": 20, "active_low": true, "description": "3.kat Orta Işık", "role": "light", "power_w": 0, "quantity": 1, "voltage_v": 12, "notes": ""},
+  {"name": "R6_LIGHT_BACK", "gpio_pin": 21, "active_low": true, "description": "3.kat Arka Işık", "role": "light", "power_w": 0, "quantity": 1, "voltage_v": 12, "notes": ""}
 ]

@@ -241,9 +241,11 @@ class ActuatorManager:
                     "description": self.channels[name].get("description", name),
                     "active_low": bool(self.channels[name].get("active_low", False)),
                     "gpio_pin": self.channels[name]["gpio_pin"],
+                    "role": self.channels[name].get("role", "other"),
                     "power_w": self.channels[name].get("power_w", 0),
                     "quantity": self.channels[name].get("quantity", 1),
                     "voltage_v": self.channels[name].get("voltage_v"),
+                    "notes": self.channels[name].get("notes", ""),
                 }
                 for name, info in self.state.items()
             }
@@ -648,6 +650,9 @@ class AutomationEngine:
     def _find_light_channel(self) -> Optional[str]:
         if LIGHT_CHANNEL_NAME:
             return LIGHT_CHANNEL_NAME.upper()
+        for name, chan in self.actuator_manager.channels.items():
+            if str(chan.get("role", "")).lower() == "light":
+                return name
         for name in self.actuator_manager.channels:
             if "LIGHT" in name:
                 return name
@@ -656,6 +661,9 @@ class AutomationEngine:
     def _find_fan_channel(self) -> Optional[str]:
         if FAN_CHANNEL_NAME:
             return FAN_CHANNEL_NAME.upper()
+        for name, chan in self.actuator_manager.channels.items():
+            if str(chan.get("role", "")).lower() == "fan":
+                return name
         for name in self.actuator_manager.channels:
             if "FAN" in name and "POT" not in name:
                 return name
@@ -665,6 +673,9 @@ class AutomationEngine:
         return None
 
     def _find_heater_channel(self) -> Optional[str]:
+        for name, chan in self.actuator_manager.channels.items():
+            if str(chan.get("role", "")).lower() == "heater":
+                return name
         for name in self.actuator_manager.channels:
             if "HEATER" in name:
                 return name
@@ -673,6 +684,9 @@ class AutomationEngine:
     def _find_pump_channel(self) -> Optional[str]:
         if PUMP_CHANNEL_NAME:
             return PUMP_CHANNEL_NAME.upper()
+        for name, chan in self.actuator_manager.channels.items():
+            if str(chan.get("role", "")).lower() == "pump":
+                return name
         for name in self.actuator_manager.channels:
             if "PUMP" in name:
                 return name
@@ -1365,13 +1379,27 @@ channel_config = []
 
 
 def load_channel_config() -> List[Dict[str, Any]]:
+    def infer_role(name: str, description: str) -> str:
+        label = f"{name} {description}".upper()
+        if "PUMP" in label or "POMPA" in label:
+            return "pump"
+        if "HEATER" in label or "ISITICI" in label or "HEAT" in label:
+            return "heater"
+        if "FAN" in label:
+            return "fan"
+        if "LIGHT" in label or "ISIK" in label or "IŞIK" in label:
+            return "light"
+        return "other"
+
     def normalize(channels: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         normalized: List[Dict[str, Any]] = []
         for chan in channels:
             entry = dict(chan)
+            entry.setdefault("role", infer_role(entry.get("name", ""), entry.get("description", "")))
             entry.setdefault("power_w", 0)
             entry.setdefault("quantity", 1)
             entry.setdefault("voltage_v", None)
+            entry.setdefault("notes", "")
             normalized.append(entry)
         return normalized
 
@@ -2353,6 +2381,11 @@ def pins() -> Any:
 @app.route("/logs")
 def logs() -> Any:
     return render_template("logs.html")
+
+
+@app.route("/hardware")
+def hardware() -> Any:
+    return render_template("hardware.html")
 
 
 @app.route("/help")

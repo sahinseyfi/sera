@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="hero p-3 rounded-4 mb-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <div>
+      <p class="text-secondary mb-1">Donanım Tanımları</p>
+      <h2 class="mb-0">Röle ve Yük Envanteri</h2>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary" id="hardwareRefresh">Yenile</button>
+      <button class="btn btn-primary" id="saveHardware">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <h6 class="mb-1">Bu sayfa ne işe yarar?</h6>
+  <div class="small text-secondary">
+    Burada her çıkışın adını, GPIO pinini, rolünü ve güç bilgisini girersin. Otomasyon kanalları rol alanına göre bulunur.
+    Enerji tahmini için güç (W), adet ve voltaj bilgisi kullanılır.
+  </div>
+</div></div>
+
+<div class="card"><div class="card-body">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle" id="hardwareTable">
+      <thead>
+        <tr>
+          <th>Ad</th>
+          <th>Rol</th>
+          <th>GPIO</th>
+          <th>Active Low</th>
+          <th>Açıklama</th>
+          <th>Güç (W)</th>
+          <th>Adet</th>
+          <th>Voltaj (V)</th>
+          <th>Not</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <small class="text-secondary">Kaydedince tüm kanallar güvenlik için OFF yapılır.</small>
+</div></div>
+
+<script>window.initHardware && window.initHardware();</script>
+{% endblock %}

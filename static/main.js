@@ -1234,6 +1234,97 @@ function savePins() {
   }).then(r => r.json()).then(() => poll());
 }
 
+window.initHardware = function() {
+  poll();
+  if (state.poller) clearInterval(state.poller);
+  state.poller = setInterval(poll, 4000);
+  const refreshBtn = document.getElementById('hardwareRefresh');
+  if (refreshBtn) refreshBtn.onclick = poll;
+  const saveBtn = document.getElementById('saveHardware');
+  if (saveBtn) saveBtn.onclick = saveHardware;
+};
+
+window.renderHardware = function(data) {
+  const body = document.querySelector('#hardwareTable tbody');
+  if (!body) return;
+  body.innerHTML = '';
+  const channels = Object.entries(data.actuator_state || {}).map(([name, info]) => ({
+    name,
+    role: info.role || 'other',
+    gpio_pin: info.gpio_pin,
+    active_low: info.active_low,
+    description: info.description || name,
+    power_w: info.power_w,
+    quantity: info.quantity,
+    voltage_v: info.voltage_v,
+    notes: info.notes || '',
+  }));
+  const roleOptions = [
+    { value: 'light', label: 'Light' },
+    { value: 'fan', label: 'Fan' },
+    { value: 'heater', label: 'Heater' },
+    { value: 'pump', label: 'Pump' },
+    { value: 'other', label: 'Other' },
+  ];
+  channels.forEach(ch => {
+    const tr = document.createElement('tr');
+    const roleSelect = `
+      <select class="form-select form-select-sm" data-field="role">
+        ${roleOptions.map(opt => `<option value="${opt.value}" ${opt.value === ch.role ? 'selected' : ''}>${opt.label}</option>`).join('')}
+      </select>
+    `;
+    tr.innerHTML = `
+      <td><input class="form-control form-control-sm" data-field="name" value="${ch.name}"></td>
+      <td>${roleSelect}</td>
+      <td><input class="form-control form-control-sm" data-field="gpio_pin" type="number" value="${ch.gpio_pin}"></td>
+      <td class="text-center"><input class="form-check-input" data-field="active_low" type="checkbox" ${ch.active_low ? 'checked' : ''}></td>
+      <td><input class="form-control form-control-sm" data-field="description" value="${ch.description}"></td>
+      <td><input class="form-control form-control-sm" data-field="power_w" type="number" step="0.1" value="${ch.power_w ?? ''}"></td>
+      <td><input class="form-control form-control-sm" data-field="quantity" type="number" step="1" value="${ch.quantity ?? 1}"></td>
+      <td><input class="form-control form-control-sm" data-field="voltage_v" type="number" step="0.1" value="${ch.voltage_v ?? ''}"></td>
+      <td><input class="form-control form-control-sm" data-field="notes" value="${ch.notes ?? ''}"></td>`;
+    body.appendChild(tr);
+  });
+};
+
+function saveHardware() {
+  const rows = Array.from(document.querySelectorAll('#hardwareTable tbody tr'));
+  const channels = rows.map(r => {
+    const nameI = r.querySelector('[data-field="name"]');
+    const roleI = r.querySelector('[data-field="role"]');
+    const gpioI = r.querySelector('[data-field="gpio_pin"]');
+    const activeI = r.querySelector('[data-field="active_low"]');
+    const descI = r.querySelector('[data-field="description"]');
+    const powerI = r.querySelector('[data-field="power_w"]');
+    const quantityI = r.querySelector('[data-field="quantity"]');
+    const voltageI = r.querySelector('[data-field="voltage_v"]');
+    const notesI = r.querySelector('[data-field="notes"]');
+    const powerRaw = powerI ? powerI.value.trim() : '';
+    const quantityRaw = quantityI ? quantityI.value.trim() : '';
+    const voltageRaw = voltageI ? voltageI.value.trim() : '';
+    const powerVal = powerRaw === '' ? 0 : parseFloat(powerRaw);
+    const quantityVal = quantityRaw === '' ? 1 : parseInt(quantityRaw, 10);
+    const voltageVal = voltageRaw === '' ? null : parseFloat(voltageRaw);
+    return {
+      name: nameI.value.trim().toUpperCase(),
+      role: roleI ? roleI.value.trim() : 'other',
+      gpio_pin: parseInt(gpioI.value, 10),
+      active_low: activeI.checked,
+      description: descI.value.trim(),
+      power_w: Number.isFinite(powerVal) ? powerVal : 0,
+      quantity: Number.isFinite(quantityVal) ? quantityVal : 1,
+      voltage_v: Number.isFinite(voltageVal) ? voltageVal : null,
+      notes: notesI ? notesI.value.trim() : '',
+      safe_default: false,
+    };
+  });
+  fetch('/api/config', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify({ channels }),
+  }).then(r => r.json()).then(() => poll());
+}
+
 function fmtMaybe(value, digits) {
   if (value === null || value === undefined) return '--';
   const num = Number(value);
