@@ -723,7 +723,7 @@ function renderHistory(data) {
     if (maxEl) maxEl.textContent = '--';
     if (lastEl) lastEl.textContent = '--';
     const canvas = document.getElementById('historyChart');
-    if (canvas) drawHistoryChart(canvas, []);
+    if (canvas) drawHistoryChart(canvas, [], metric);
     return;
   }
 
@@ -744,11 +744,11 @@ function renderHistory(data) {
   const canvas = document.getElementById('historyChart');
   if (canvas) {
     const sampled = downsamplePoints(points, 800);
-    drawHistoryChart(canvas, sampled, minVal, maxVal);
+    drawHistoryChart(canvas, sampled, metric, minVal, maxVal);
   }
 }
 
-function drawHistoryChart(canvas, points, minVal, maxVal) {
+function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   const width = canvas.clientWidth || 600;
@@ -758,7 +758,7 @@ function drawHistoryChart(canvas, points, minVal, maxVal) {
   canvas.height = Math.floor(height * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
-  const pad = 12;
+  const pad = 36;
   const plotW = width - pad * 2;
   const plotH = height - pad * 2;
 
@@ -780,6 +780,19 @@ function drawHistoryChart(canvas, points, minVal, maxVal) {
   }
 
   const range = (maxVal - minVal) || 1;
+  const midVal = minVal + (range / 2);
+  const labelColor = '#64748b';
+  ctx.fillStyle = labelColor;
+  ctx.font = '11px "Space Grotesk", sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  const yTop = pad;
+  const yMid = pad + plotH / 2;
+  const yBot = pad + plotH;
+  ctx.fillText(formatMetricValue(maxVal, metric), pad - 8, yTop);
+  ctx.fillText(formatMetricValue(midVal, metric), pad - 8, yMid);
+  ctx.fillText(formatMetricValue(minVal, metric), pad - 8, yBot);
+
   ctx.beginPath();
   points.forEach((point, idx) => {
     const value = Number(point[1]);
@@ -808,6 +821,22 @@ function drawHistoryChart(canvas, points, minVal, maxVal) {
   ctx.strokeStyle = '#0ea5a4';
   ctx.lineWidth = 2;
   ctx.stroke();
+
+  const lastPoint = points[points.length - 1];
+  if (lastPoint) {
+    const value = Number(lastPoint[1]);
+    const x = pad + plotW;
+    const y = pad + plotH - ((value - minVal) / range) * plotH;
+    ctx.fillStyle = '#0ea5a4';
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '11px "Space Grotesk", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(formatMetricValue(value, metric), x + 6, y);
+  }
 }
 
 function initEvents() {
