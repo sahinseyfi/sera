@@ -6,9 +6,12 @@ Flask tabanlı Raspberry Pi 4 kontrol paneli. Sensörleri izler, röleleri güve
 - `app.py`: Flask app, API, otomasyon, GPIO katmanı (SIMULATION_MODE destekli).
 - `templates/`, `static/`: Dashboard, kontrol, ayar, pin mapping sayfaları.
 - `config/channels.json`: Röle/gpio mapping (active-low desteği).
-- `data/sera.db`: Aktüatör logları (SQLite).
+- `data/sera.db`: Aktüatör + sensör logları (SQLite).
+- `data/sensor_logs/`: Günlük sensör CSV logları (git dışı).
 - `systemd/sera-panel.service`: Servis örneği.
 - `tests/`: SIMULATION_MODE ile temel API kontrolleri.
+- `sera_panel/`: Alternatif giriş (launcher) ve eski sürüm.
+- `sera_projesi/`: Eski/alternatif giriş noktası.
 
 ## Kurulum
 ```bash
@@ -29,12 +32,28 @@ python app.py
 ```
 Giriş: `http://<pi-ip>:5000`. SAFE MODE başta açık; Ayarlar sekmesinden kapatabilirsiniz. Test paneli: `http://<pi-ip>:5000/test`. `ADMIN_TOKEN` tanımlarsanız admin endpointlerinde `X-Admin-Token` header’ı zorunlu olur.
 
+## Panel Sayfaları
+- `Dashboard`: Anlık sensörler, grafikler, uyarılar, otomasyon özeti.
+- `Kontrol`: Röleleri güvenli şekilde aç/kapat, pompa süreli çalıştır.
+- `Ayarlar`: SAFE MODE, limitler, otomasyon eşikleri.
+- `Pin Mapping`: Kanal → GPIO eşlemesi.
+- `Loglar`: Sensör kayıtlarını listele, CSV indir.
+- `Yardım/SSS`: Sayfa açıklamaları ve sık sorulanlar.
+
+## Sensör Logları
+- SQLite: `data/sera.db` içinde `sensor_log` tablosu.
+- CSV: `data/sensor_logs/sensor_log_YYYY-MM-DD.csv` günlük dosyalar.
+- Varsayılan log aralığı: `SENSOR_LOG_INTERVAL_SECONDS = 10`.
+- Loglar sayfası SQLite verisini gösterir; CSV indir aynı veriyi dışa aktarır.
+
 ## API
 - `GET /api/status` → sensörler, aktüatör durumu, safe_mode, limitler, otomasyon.
 - `POST /api/actuator/<name>` body: `{"state":"on|off","seconds":optional}`; SAFE MODE açıkken 403. Pompa: `seconds` zorunlu, `pump_max_seconds` + `pump_cooldown_seconds` uygulanır. Isıtıcı `heater_max_seconds` ile sınırlı.
 - `POST /api/emergency_stop` → tüm kanalları OFF (SAFE MODE olsa da çalışır).
 - `POST /api/settings` → `{safe_mode, limits, automation}` admin korumalı.
 - `GET/POST /api/config` veya `/api/pins` → kanal mapping oku/yaz; mapping değişince tüm kanallar OFF.
+- `GET /api/sensor_log` → sensör log kayıtları (JSON/CSV).
+- `POST /api/sensor_log/clear` → sensör loglarını temizle (admin).
 
 ## systemd (örnek)
 ```bash
@@ -48,6 +67,13 @@ sudo systemctl enable --now sera-panel.service
 ```bash
 SIMULATION_MODE=1 DISABLE_BACKGROUND_LOOPS=1 pytest -q
 ```
+
+## Ortam Değişkenleri
+- `SIMULATION_MODE=1`: Donanım olmadan simülasyon.
+- `DISABLE_BACKGROUND_LOOPS=1`: Sensör/otomasyon thread’lerini kapatır.
+- `ADMIN_TOKEN`: Admin endpointleri için token.
+- `LIGHT_CHANNEL_NAME`, `FAN_CHANNEL_NAME`, `PUMP_CHANNEL_NAME`: Otomasyon için kanal override.
+- `DHT22_GPIO`, `BH1750_ADDR`: Donanım adres/pin override.
 
 ## Güvenlik & Güvenli Varsayılanlar
 - Uygulama açılışında tüm aktüatörler OFF; active-low röleler desteklenir.
