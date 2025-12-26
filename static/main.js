@@ -758,8 +758,18 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
   canvas.height = Math.floor(height * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
-  const pad = 36;
-  const plotW = width - pad * 2;
+  const labelFont = '11px "Space Grotesk", sans-serif';
+  const labelValues = [minVal, maxVal];
+  if (minVal != null && maxVal != null) {
+    labelValues.push(minVal + ((maxVal - minVal) || 0) / 2);
+  }
+  ctx.font = labelFont;
+  const labelWidths = labelValues
+    .filter(v => v != null && Number.isFinite(Number(v)))
+    .map(v => ctx.measureText(formatMetricValue(Number(v), metric)).width);
+  const labelPad = labelWidths.length ? Math.max(...labelWidths) + 16 : 36;
+  const pad = Math.max(36, Math.min(64, Math.ceil(labelPad)));
+  const plotW = width - pad - 18;
   const plotH = height - pad * 2;
 
   ctx.strokeStyle = 'rgba(148,163,184,0.4)';
@@ -772,7 +782,7 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
     ctx.stroke();
   }
 
-  if (!points.length || points.length < 2) {
+  if (!points.length) {
     ctx.fillStyle = '#94a3b8';
     ctx.font = '12px "Space Grotesk", sans-serif';
     ctx.fillText('Veri yok', pad, height / 2);
@@ -783,15 +793,31 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
   const midVal = minVal + (range / 2);
   const labelColor = '#64748b';
   ctx.fillStyle = labelColor;
-  ctx.font = '11px "Space Grotesk", sans-serif';
+  ctx.font = labelFont;
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   const yTop = pad;
   const yMid = pad + plotH / 2;
   const yBot = pad + plotH;
-  ctx.fillText(formatMetricValue(maxVal, metric), pad - 8, yTop);
-  ctx.fillText(formatMetricValue(midVal, metric), pad - 8, yMid);
-  ctx.fillText(formatMetricValue(minVal, metric), pad - 8, yBot);
+  ctx.fillText(formatMetricValue(maxVal, metric), pad - 10, yTop);
+  ctx.fillText(formatMetricValue(midVal, metric), pad - 10, yMid);
+  ctx.fillText(formatMetricValue(minVal, metric), pad - 10, yBot);
+
+  if (points.length < 2) {
+    const value = Number(points[0][1]);
+    const x = pad + plotW;
+    const y = pad + plotH - ((value - minVal) / range) * plotH;
+    ctx.fillStyle = '#0ea5a4';
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#0f172a';
+    ctx.font = labelFont;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(formatMetricValue(value, metric), x + 6, y);
+    return;
+  }
 
   ctx.beginPath();
   points.forEach((point, idx) => {
