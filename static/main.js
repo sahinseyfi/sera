@@ -10,6 +10,7 @@ const state = {
   historyTimer: null,
   eventsTimer: null,
   eventsLastFetch: 0,
+  settingsSavedTimer: null,
 };
 
 const HISTORY_METRICS = {
@@ -1011,6 +1012,10 @@ function bindCalibrationButtons() {
 function saveSettings() {
   const savedNote = document.getElementById('settingsSavedNote');
   if (savedNote) savedNote.textContent = '';
+  if (state.settingsSavedTimer) {
+    clearTimeout(state.settingsSavedTimer);
+    state.settingsSavedTimer = null;
+  }
   const tokenInput = document.getElementById('adminTokenInput');
   if (tokenInput) {
     const value = tokenInput.value.trim();
@@ -1136,7 +1141,13 @@ function saveSettings() {
       if (savedNote) savedNote.textContent = '';
       return;
     }
-    if (savedNote) savedNote.textContent = 'Kaydedildi';
+    if (savedNote) {
+      savedNote.textContent = 'Kaydedildi';
+      state.settingsSavedTimer = setTimeout(() => {
+        savedNote.textContent = '';
+        state.settingsSavedTimer = null;
+      }, 3000);
+    }
     poll();
   });
 }

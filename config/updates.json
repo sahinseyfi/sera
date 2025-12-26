@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Kaydedildi mesaji otomatik gizleniyor",
+    "summary": "Kaydedildi yazisi birkac saniye sonra kendiliginden kaybolur.",
+    "details": [
+      "Bildirim 3 saniye gorunur.",
+      "Ekran kalabaligi azalir."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Kaydet butonu uste alindi",
     "summary": "Ayarlar icin Kaydet en ustte ve kayit sonrasi bildirim var.",
     "details": [
