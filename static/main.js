@@ -6,6 +6,8 @@ const state = {
     range: '24h',
     lastFetch: 0,
     data: null,
+    render: null,
+    hoverBound: false,
   },
   historyTimer: null,
   eventsTimer: null,
@@ -49,6 +51,15 @@ function formatUnixSeconds(ts) {
   if (!ts) return '---';
   try {
     return new Date(ts * 1000).toLocaleTimeString();
+  } catch (e) {
+    return ts;
+  }
+}
+
+function formatUnixMinutes(ts) {
+  if (!ts) return '---';
+  try {
+    return new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   } catch (e) {
     return ts;
   }
@@ -675,6 +686,50 @@ function initHistory() {
   window.addEventListener('resize', () => {
     if (state.history.data) renderHistory(state.history.data);
   });
+  bindHistoryHover();
+}
+
+function bindHistoryHover() {
+  if (state.history.hoverBound) return;
+  const canvas = document.getElementById('historyChart');
+  const tooltip = document.getElementById('historyTooltip');
+  if (!canvas || !tooltip) return;
+  const wrap = canvas.closest('.history-chart-wrap');
+  if (!wrap) return;
+  canvas.addEventListener('mousemove', (event) => {
+    const render = state.history.render;
+    if (!render || !render.points || !render.points.length) {
+      tooltip.classList.add('d-none');
+      return;
+    }
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const { pad, plotW, plotH, points, minVal, maxVal, metric } = render;
+    if (x < pad || x > pad + plotW || y < pad || y > pad + plotH) {
+      tooltip.classList.add('d-none');
+      return;
+    }
+    const ratio = (x - pad) / plotW;
+    const idx = Math.min(points.length - 1, Math.max(0, Math.round(ratio * (points.length - 1))));
+    const point = points[idx];
+    let value = Number(point[1]);
+    if (metric === 'dht_temp' || metric === 'ds18_temp') {
+      value = Math.min(maxVal, Math.max(minVal, value));
+    }
+    const timeLabel = formatUnixMinutes(point[0]);
+    const valueLabel = formatMetricValue(value, metric);
+    tooltip.textContent = `${timeLabel} · ${valueLabel}`;
+    tooltip.classList.remove('d-none');
+    const wrapRect = wrap.getBoundingClientRect();
+    const left = Math.min(wrapRect.width - tooltip.offsetWidth - 8, Math.max(8, x + 12));
+    const top = Math.max(8, y - 28);
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  });
+  canvas.addEventListener('mouseleave', () => tooltip.classList.add('d-none'));
+  window.addEventListener('scroll', () => tooltip.classList.add('d-none'), { passive: true });
+  state.history.hoverBound = true;
 }
 
 function setHistoryRange(range) {
@@ -777,9 +832,13 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
   const labelFont = '11px "Space Grotesk", sans-serif';
-  const labelValues = [minVal, maxVal];
+  const tickCount = 5;
+  const labelValues = [];
   if (minVal != null && maxVal != null) {
-    labelValues.push(minVal + ((maxVal - minVal) || 0) / 2);
+    const rawRange = (maxVal - minVal) || 1;
+    for (let i = 0; i < tickCount; i += 1) {
+      labelValues.push(maxVal - (rawRange * (i / (tickCount - 1))));
+    }
   }
   ctx.font = labelFont;
   const labelWidths = labelValues
@@ -792,8 +851,8 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
 
   ctx.strokeStyle = 'rgba(148,163,184,0.4)';
   ctx.lineWidth = 1;
-  for (let i = 0; i <= 2; i += 1) {
-    const y = pad + (plotH * (i / 2));
+  for (let i = 0; i < tickCount; i += 1) {
+    const y = pad + (plotH * (i / (tickCount - 1)));
     ctx.beginPath();
     ctx.moveTo(pad, y);
     ctx.lineTo(pad + plotW, y);
@@ -812,31 +871,29 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
     maxVal = 45;
   }
   const range = (maxVal - minVal) || 1;
-  const midVal = minVal + (range / 2);
   const labelColor = '#64748b';
   ctx.fillStyle = labelColor;
   ctx.font = labelFont;
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
-  const yTop = pad;
-  const yMid = pad + plotH / 2;
-  const yBot = pad + plotH;
-  ctx.fillText(formatMetricValue(maxVal, metric), pad - 10, yTop);
-  ctx.fillText(formatMetricValue(midVal, metric), pad - 10, yMid);
-  ctx.fillText(formatMetricValue(minVal, metric), pad - 10, yBot);
+  for (let i = 0; i < tickCount; i += 1) {
+    const y = pad + (plotH * (i / (tickCount - 1)));
+    const value = maxVal - (range * (i / (tickCount - 1)));
+    ctx.fillText(formatMetricValue(value, metric), pad - 10, y);
+  }
 
   const timeLabelY = pad + plotH + 8;
   const timeLabelColor = '#64748b';
   ctx.fillStyle = timeLabelColor;
   ctx.textBaseline = 'top';
   if (points.length >= 2) {
-    const labelCount = Math.max(3, Math.min(6, Math.floor(plotW / 140)));
+    const labelCount = Math.max(4, Math.min(8, Math.floor(plotW / 110)));
     for (let i = 0; i < labelCount; i += 1) {
       const idx = Math.round((points.length - 1) * (i / (labelCount - 1)));
       const ts = points[idx][0];
       const x = pad + (plotW * (i / (labelCount - 1)));
       ctx.textAlign = i === 0 ? 'left' : (i === labelCount - 1 ? 'right' : 'center');
-      ctx.fillText(formatUnixSeconds(ts), x, timeLabelY);
+      ctx.fillText(formatUnixMinutes(ts), x, timeLabelY);
     }
   }
 
@@ -861,7 +918,7 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
     ctx.font = labelFont;
     ctx.textAlign = 'right';
     ctx.textBaseline = 'top';
-    ctx.fillText(formatUnixSeconds(ts), pad + plotW, timeLabelY);
+    ctx.fillText(formatUnixMinutes(ts), pad + plotW, timeLabelY);
     return;
   }
 
@@ -918,6 +975,15 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
     ctx.textBaseline = 'middle';
     ctx.fillText(formatMetricValue(value, metric), x + 6, y);
   }
+  state.history.render = {
+    points,
+    metric,
+    minVal,
+    maxVal,
+    pad,
+    plotW,
+    plotH,
+  };
 }
 
 function initEvents() {

@@ -1,6 +1,16 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Grafiklerde hover bilgi ve sık etiketler",
+    "summary": "Grafikte gezince saat ve değer görünür, eksen etiketleri sıklaştırıldı.",
+    "details": [
+      "Mouse ile grafikte gezince saat:dakika ve ölçüm değeri gösterilir.",
+      "Y ekseni ve zaman etiketleri daha sık görünüyor.",
+      "Grafik yüksekliği artırıldı."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Sicaklik grafigi sabitlendi",
     "summary": "Asiri DHT degerleri gorse bile sicaklik grafigi bozulmaz.",
     "details": [
