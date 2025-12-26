@@ -251,6 +251,7 @@ class ActuatorManager:
                     "quantity": self.channels[name].get("quantity", 1),
                     "voltage_v": self.channels[name].get("voltage_v"),
                     "notes": self.channels[name].get("notes", ""),
+                    "enabled": bool(self.channels[name].get("enabled", True)),
                 }
                 for name, info in self.state.items()
             }
@@ -1533,6 +1534,7 @@ def load_channel_config() -> List[Dict[str, Any]]:
             entry.setdefault("quantity", 1)
             entry.setdefault("voltage_v", None)
             entry.setdefault("notes", "")
+            entry.setdefault("enabled", True)
             normalized.append(entry)
         return normalized
 
@@ -1548,6 +1550,7 @@ def load_channel_config() -> List[Dict[str, Any]]:
             "power_w": 0,
             "quantity": 1,
             "voltage_v": None,
+            "enabled": True,
         },
         {
             "name": "R2_LIGHT_K1B",
@@ -1557,6 +1560,7 @@ def load_channel_config() -> List[Dict[str, Any]]:
             "power_w": 0,
             "quantity": 1,
             "voltage_v": None,
+            "enabled": True,
         },
         {
             "name": "R3_PUMP",
@@ -1566,6 +1570,7 @@ def load_channel_config() -> List[Dict[str, Any]]:
             "power_w": 0,
             "quantity": 1,
             "voltage_v": None,
+            "enabled": True,
         },
         {
             "name": "R4_HEATER",
@@ -1575,6 +1580,7 @@ def load_channel_config() -> List[Dict[str, Any]]:
             "power_w": 0,
             "quantity": 1,
             "voltage_v": None,
+            "enabled": True,
         },
         {
             "name": "R5_FAN",
@@ -1584,6 +1590,7 @@ def load_channel_config() -> List[Dict[str, Any]]:
             "power_w": 0,
             "quantity": 1,
             "voltage_v": None,
+            "enabled": True,
         },
         {
             "name": "R6_POT_FAN",
@@ -1593,6 +1600,7 @@ def load_channel_config() -> List[Dict[str, Any]]:
             "power_w": 0,
             "quantity": 1,
             "voltage_v": None,
+            "enabled": True,
         },
     ]
     CONFIG_DIR.mkdir(exist_ok=True)

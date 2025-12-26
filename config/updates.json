@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Olay gunlugunde pasif donanimlar gizlendi",
+    "summary": "Disabled olan cikislar artik olay gunlugunde gorunmuyor.",
+    "details": [
+      "Donanim sayfasindan Aktif secenegi kapali olanlar listeden gizlenir.",
+      "Gereksiz log kalabaligi azaldi."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Grafik alti saat etiketleri eklendi",
     "summary": "Grafiklerde alt kisimda zaman etiketleri gorunur hale geldi.",
     "details": [

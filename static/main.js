@@ -922,7 +922,18 @@ function renderEvents(data) {
   if (!wrap) return;
   const updated = document.getElementById('eventLogUpdated');
   if (updated) updated.textContent = new Date().toLocaleTimeString();
-  const events = Array.isArray(data.events) ? data.events : [];
+  const eventsRaw = Array.isArray(data.events) ? data.events : [];
+  const disabledNames = new Set(
+    Object.entries((state.status && state.status.actuator_state) || {})
+      .filter(([, info]) => info && info.enabled === false)
+      .map(([name]) => name.toUpperCase())
+  );
+  const events = eventsRaw.filter(event => {
+    if (event.category !== 'actuator') return true;
+    const metaName = event.meta && event.meta.name;
+    if (!metaName) return true;
+    return !disabledNames.has(String(metaName).toUpperCase());
+  });
   if (!events.length) {
     wrap.textContent = 'Olay yok.';
     return;
@@ -1299,6 +1310,7 @@ window.renderHardware = function(data) {
     quantity: info.quantity,
     voltage_v: info.voltage_v,
     notes: info.notes || '',
+    enabled: info.enabled !== false,
   }));
   const roleOptions = [
     { value: 'light', label: 'Light' },
@@ -1317,6 +1329,7 @@ window.renderHardware = function(data) {
     `;
     tr.innerHTML = `
       <td><input class="form-control form-control-sm" data-field="name" value="${ch.name}"></td>
+      <td class="text-center"><input class="form-check-input" data-field="enabled" type="checkbox" ${ch.enabled ? 'checked' : ''}></td>
       <td>${roleSelect}</td>
       <td><input class="form-control form-control-sm" data-field="gpio_pin" type="number" value="${ch.gpio_pin}"></td>
       <td class="text-center"><input class="form-check-input" data-field="active_low" type="checkbox" ${ch.active_low ? 'checked' : ''}></td>
@@ -1342,6 +1355,7 @@ function saveHardware() {
     const quantityI = r.querySelector('[data-field="quantity"]');
     const voltageI = r.querySelector('[data-field="voltage_v"]');
     const notesI = r.querySelector('[data-field="notes"]');
+    const enabledI = r.querySelector('[data-field="enabled"]');
     const powerRaw = powerI ? powerI.value.trim() : '';
     const quantityRaw = quantityI ? quantityI.value.trim() : '';
     const voltageRaw = voltageI ? voltageI.value.trim() : '';
@@ -1359,6 +1373,7 @@ function saveHardware() {
       voltage_v: Number.isFinite(voltageVal) ? voltageVal : null,
       notes: notesI ? notesI.value.trim() : '',
       safe_default: false,
+      enabled: enabledI ? enabledI.checked : true,
     };
   });
   fetch('/api/config', {
