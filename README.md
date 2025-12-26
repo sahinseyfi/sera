@@ -46,6 +46,18 @@ Giriş: `http://<pi-ip>:5000`. SAFE MODE başta açık; Ayarlar sekmesinden kapa
 - Varsayılan log aralığı: `SENSOR_LOG_INTERVAL_SECONDS = 10`.
 - Loglar sayfası SQLite verisini gösterir; CSV indir aynı veriyi dışa aktarır.
 
+## Donanım Test Scriptleri
+- `dht_test.py`: DHT22 sıcaklık/nem okuma testi.
+- `bh_test.py`: BH1750 lux okuma testi.
+- `i2c_sensors_test.py`: BH1750 + ADS1115 I2C testi.
+- `lcd_test.py`: 20x4 I2C LCD kısa yazma testi.
+- `sensors_test.py`: BH1750 + DHT22 birleşik okuma.
+- `moisture_raw.py`: ADS1115 raw toprak nemi okuma.
+- `moisture_log.py`: ADS1115 toprak nemi CSV loglama (yerel dosya).
+- `relay_test.py`: Röle manuel test sıralaması (pompa hariç).
+- `sera_panel/relay_click_test.sh`: Röle tıklama testi.
+- `sera_panel/relay_polarity_test.sh`: Röle aktif-low/aktif-high kontrolü.
+
 ## API
 - `GET /api/status` → sensörler, aktüatör durumu, safe_mode, limitler, otomasyon.
 - `POST /api/actuator/<name>` body: `{"state":"on|off","seconds":optional}`; SAFE MODE açıkken 403. Pompa: `seconds` zorunlu, `pump_max_seconds` + `pump_cooldown_seconds` uygulanır. Isıtıcı `heater_max_seconds` ile sınırlı.
