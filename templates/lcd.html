@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="hero p-3 rounded-4 mb-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <div>
+      <p class="text-secondary mb-1">I2C LCD</p>
+      <h2 class="mb-0">LCD Kontrol ve Önizleme</h2>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary" id="lcdRefresh">Yenile</button>
+      <button class="btn btn-primary" id="lcdSave">Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <h6 class="mb-1">Bu sayfa ne işe yarar?</h6>
+  <div class="small text-secondary">
+    LCD’nin otomatik (sensör özet) veya manuel metin modunu seçip, ekranda ne görüneceğini ayarlarsın.
+  </div>
+</div></div>
+
+<div class="card mb-3"><div class="card-body">
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label class="form-label">LCD Aktif</label>
+      <select class="form-select" id="lcdEnabled">
+        <option value="true">Açık</option>
+        <option value="false">Kapalı</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Mod</label>
+      <select class="form-select" id="lcdMode">
+        <option value="auto">Otomatik</option>
+        <option value="manual">Manuel</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Adres</label>
+      <input class="form-control" id="lcdAddr" placeholder="0x27">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Port</label>
+      <input class="form-control" id="lcdPort" type="number" value="1">
+    </div>
+  </div>
+  <div class="row g-2 mt-2">
+    <div class="col-md-3">
+      <label class="form-label">Kolon</label>
+      <input class="form-control" id="lcdCols" type="number" value="20">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Satır</label>
+      <input class="form-control" id="lcdRows" type="number" value="4">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Expander</label>
+      <input class="form-control" id="lcdExpander" placeholder="PCF8574">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Charmap</label>
+      <input class="form-control" id="lcdCharmap" placeholder="A00">
+    </div>
+  </div>
+</div></div>
+
+<div class="card mb-3"><div class="card-body">
+  <h6 class="mb-2">Manuel Satırlar</h6>
+  <div class="row g-2">
+    <div class="col-md-6">
+      <input class="form-control" id="lcdLine0" maxlength="20" placeholder="Satır 1">
+    </div>
+    <div class="col-md-6">
+      <input class="form-control" id="lcdLine1" maxlength="20" placeholder="Satır 2">
+    </div>
+    <div class="col-md-6">
+      <input class="form-control" id="lcdLine2" maxlength="20" placeholder="Satır 3">
+    </div>
+    <div class="col-md-6">
+      <input class="form-control" id="lcdLine3" maxlength="20" placeholder="Satır 4">
+    </div>
+  </div>
+</div></div>
+
+<div class="card"><div class="card-body">
+  <h6 class="mb-2">Önizleme</h6>
+  <div class="lcd-preview" id="lcdPreview"></div>
+</div></div>
+
+<style>
+  .lcd-preview {
+    background: #0f172a;
+    color: #bef264;
+    border-radius: 10px;
+    padding: 12px;
+    font-family: "Space Grotesk", monospace;
+    letter-spacing: 0.06em;
+  }
+  .lcd-preview-line {
+    white-space: pre;
+  }
+</style>
+
+<script>window.initLcd && window.initLcd();</script>
+{% endblock %}

@@ -158,6 +158,7 @@ function renderStatus(status) {
   if (window.renderControl) window.renderControl(status);
   if (window.renderSettings) window.renderSettings(status);
   if (window.renderPins) window.renderPins(status);
+  if (window.renderLcd) window.renderLcd(status);
 }
 
 function poll() {
@@ -1505,6 +1506,103 @@ window.initLogs = function() {
   updateSensorLogDownloadLink();
   refreshSensorLog();
 };
+
+function renderLcdPreview(lines) {
+  const wrap = document.getElementById('lcdPreview');
+  if (!wrap) return;
+  const safeLines = Array.isArray(lines) ? lines : [];
+  wrap.innerHTML = safeLines.map(line => `<div class="lcd-preview-line">${line ?? ''}</div>`).join('');
+}
+
+window.initLcd = function() {
+  poll();
+  if (state.poller) clearInterval(state.poller);
+  state.poller = setInterval(poll, 4000);
+  const refreshBtn = document.getElementById('lcdRefresh');
+  const saveBtn = document.getElementById('lcdSave');
+  if (refreshBtn) refreshBtn.onclick = () => fetchLcdConfig();
+  if (saveBtn) saveBtn.onclick = saveLcd;
+  fetchLcdConfig();
+};
+
+window.renderLcd = function(data) {
+  const lcd = data.lcd || {};
+  renderLcdPreview(lcd.lines || []);
+};
+
+function fetchLcdConfig() {
+  fetch('/api/lcd')
+    .then(r => r.json())
+    .then(data => {
+      const cfg = data.config || {};
+      const lcd = data.lcd || {};
+      const enabled = document.getElementById('lcdEnabled');
+      const mode = document.getElementById('lcdMode');
+      const addr = document.getElementById('lcdAddr');
+      const port = document.getElementById('lcdPort');
+      const cols = document.getElementById('lcdCols');
+      const rows = document.getElementById('lcdRows');
+      const expander = document.getElementById('lcdExpander');
+      const charmap = document.getElementById('lcdCharmap');
+      if (enabled) enabled.value = cfg.lcd_enabled === false ? 'false' : 'true';
+      if (mode) mode.value = cfg.lcd_mode || 'auto';
+      if (addr) addr.value = cfg.lcd_addr || '0x27';
+      if (port) port.value = cfg.lcd_port ?? 1;
+      if (cols) cols.value = cfg.lcd_cols ?? 20;
+      if (rows) rows.value = cfg.lcd_rows ?? 4;
+      if (expander) expander.value = cfg.lcd_expander || 'PCF8574';
+      if (charmap) charmap.value = cfg.lcd_charmap || 'A00';
+      const lines = cfg.lcd_lines || ["", "", "", ""];
+      const l0 = document.getElementById('lcdLine0');
+      const l1 = document.getElementById('lcdLine1');
+      const l2 = document.getElementById('lcdLine2');
+      const l3 = document.getElementById('lcdLine3');
+      if (l0) l0.value = lines[0] || '';
+      if (l1) l1.value = lines[1] || '';
+      if (l2) l2.value = lines[2] || '';
+      if (l3) l3.value = lines[3] || '';
+      renderLcdPreview(lcd.lines || lines);
+    })
+    .catch(() => {});
+}
+
+function saveLcd() {
+  const enabled = document.getElementById('lcdEnabled');
+  const mode = document.getElementById('lcdMode');
+  const addr = document.getElementById('lcdAddr');
+  const port = document.getElementById('lcdPort');
+  const cols = document.getElementById('lcdCols');
+  const rows = document.getElementById('lcdRows');
+  const expander = document.getElementById('lcdExpander');
+  const charmap = document.getElementById('lcdCharmap');
+  const l0 = document.getElementById('lcdLine0');
+  const l1 = document.getElementById('lcdLine1');
+  const l2 = document.getElementById('lcdLine2');
+  const l3 = document.getElementById('lcdLine3');
+  const payload = {
+    config: {
+      lcd_enabled: enabled ? enabled.value === 'true' : true,
+      lcd_mode: mode ? mode.value : 'auto',
+      lcd_addr: addr ? addr.value.trim() : '0x27',
+      lcd_port: port ? parseInt(port.value || '1', 10) : 1,
+      lcd_cols: cols ? parseInt(cols.value || '20', 10) : 20,
+      lcd_rows: rows ? parseInt(rows.value || '4', 10) : 4,
+      lcd_expander: expander ? expander.value.trim() : 'PCF8574',
+      lcd_charmap: charmap ? charmap.value.trim() : 'A00',
+    },
+    lines: [
+      l0 ? l0.value : '',
+      l1 ? l1.value : '',
+      l2 ? l2.value : '',
+      l3 ? l3.value : '',
+    ],
+  };
+  fetch('/api/lcd', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify(payload),
+  }).then(r => r.json()).then(() => fetchLcdConfig());
+}
 
 window.addEventListener('beforeunload', () => {
   if (state.poller) clearInterval(state.poller);

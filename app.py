@@ -595,6 +595,141 @@ class SensorManager:
             return {"readings": self.last_readings, "ts": self.last_ts}
 
 
+class LCDManager:
+    def __init__(self, config: Dict[str, Any]) -> None:
+        self.lock = threading.Lock()
+        self.config = dict(config)
+        self.lcd = None
+        self.last_lines = ["", "", "", ""]
+        self._init_hardware()
+
+    def _init_hardware(self) -> None:
+        enabled = bool(self.config.get("lcd_enabled", True))
+        if not enabled:
+            self.lcd = None
+            return
+        try:
+            from RPLCD.i2c import CharLCD  # type: ignore
+        except Exception:
+            self.lcd = None
+            return
+        try:
+            addr_raw = str(self.config.get("lcd_addr", "0x27"))
+            try:
+                addr = int(addr_raw, 0)
+            except Exception:
+                addr = 0x27
+            cols = int(self.config.get("lcd_cols", 20))
+            rows = int(self.config.get("lcd_rows", 4))
+            port = int(self.config.get("lcd_port", 1))
+            expander = str(self.config.get("lcd_expander", "PCF8574"))
+            charmap = str(self.config.get("lcd_charmap", "A00"))
+            self.lcd = CharLCD(
+                i2c_expander=expander,
+                address=addr,
+                port=port,
+                cols=cols,
+                rows=rows,
+                charmap=charmap,
+                auto_linebreaks=True,
+            )
+        except Exception:
+            self.lcd = None
+
+    def update_config(self, config: Dict[str, Any]) -> None:
+        with self.lock:
+            self.config = dict(config)
+            self._init_hardware()
+
+    def status(self) -> Dict[str, Any]:
+        with self.lock:
+            return {
+                "enabled": bool(self.config.get("lcd_enabled", True)),
+                "mode": self.config.get("lcd_mode", "auto"),
+                "lines": list(self.last_lines),
+            }
+
+    def set_manual_lines(self, lines: List[str]) -> None:
+        with self.lock:
+            self.config["lcd_mode"] = "manual"
+            self.config["lcd_lines"] = list(lines)
+            self._write_lines(lines)
+
+    def render_auto(self, data: Dict[str, Any]) -> None:
+        with self.lock:
+            if not bool(self.config.get("lcd_enabled", True)):
+                return
+            if self.config.get("lcd_mode", "auto") != "auto":
+                return
+            lines = self._build_auto_lines(data)
+            self._write_lines(lines)
+
+    def _write_lines(self, lines: List[str]) -> None:
+        formatted = self._format_lines(lines)
+        self.last_lines = list(formatted)
+        if not self.lcd:
+            return
+        try:
+            for idx, line in enumerate(formatted):
+                self.lcd.cursor_pos = (idx, 0)
+                self.lcd.write_string(line)
+        except Exception:
+            self.lcd = None
+
+    def _format_lines(self, lines: List[str]) -> List[str]:
+        cols = int(self.config.get("lcd_cols", 20))
+        rows = int(self.config.get("lcd_rows", 4))
+        padded = [(line or "")[:cols].ljust(cols) for line in lines]
+        while len(padded) < rows:
+            padded.append("".ljust(cols))
+        return padded[:rows]
+
+    def _build_auto_lines(self, data: Dict[str, Any]) -> List[str]:
+        readings = data.get("sensor_readings", {})
+        dht = readings.get("dht22", {}) if isinstance(readings.get("dht22"), dict) else {}
+        lux = readings.get("bh1750", {}) if isinstance(readings.get("bh1750"), dict) else {}
+        soil = readings.get("soil", {}) if isinstance(readings.get("soil"), dict) else {}
+
+        temp = dht.get("temperature")
+        hum = dht.get("humidity")
+        if temp is None or hum is None:
+            line0 = "T: --.-C  N: --.-%"
+        else:
+            line0 = f"T:{float(temp):4.1f}C  N:{float(hum):4.1f}%"
+
+        lux_val = lux.get("lux")
+        line1 = f"Isik: {int(lux_val):5d} lux" if lux_val is not None else "Isik:  ----- lux"
+
+        soil_raw = soil.get("ch0")
+        soil_pct = self._soil_percent("ch0", soil_raw)
+        if soil_pct is None:
+            line2 = f"Toprak: {int(soil_raw):4d}" if soil_raw is not None else "Toprak:   --"
+        else:
+            line2 = f"Toprak: {soil_pct:3d} %"
+
+        safe_mode = bool(data.get("safe_mode"))
+        line3 = "SAFE MODE" if safe_mode else "Sistem: AKTIF"
+        return [line0, line1, line2, line3]
+
+    def _soil_percent(self, channel: str, raw: Any) -> Optional[int]:
+        if raw is None:
+            return None
+        calibration = app_state.automation.config.get("soil_calibration", {}) if app_state else {}
+        entry = calibration.get(channel) or {}
+        dry = entry.get("dry")
+        wet = entry.get("wet")
+        try:
+            dry_val = float(dry)
+            wet_val = float(wet)
+            raw_val = float(raw)
+        except (TypeError, ValueError):
+            return None
+        if dry_val == wet_val:
+            return None
+        pct = (dry_val - raw_val) / (dry_val - wet_val) * 100
+        pct = max(0, min(100, pct))
+        return int(pct)
+
 class AutomationEngine:
     def __init__(self, actuator_manager: ActuatorManager, sensor_manager: SensorManager):
         self.actuator_manager = actuator_manager
@@ -1504,6 +1639,15 @@ def load_sensors_config() -> Dict[str, Any]:
         "bh1750_addr": os.getenv("BH1750_ADDR", "0x23"),
         "ads1115_addr": "0x48",
         "ds18b20_enabled": True,
+        "lcd_enabled": True,
+        "lcd_addr": "0x27",
+        "lcd_port": 1,
+        "lcd_cols": 20,
+        "lcd_rows": 4,
+        "lcd_expander": "PCF8574",
+        "lcd_charmap": "A00",
+        "lcd_mode": "auto",
+        "lcd_lines": ["", "", "", ""],
     }
     if SENSORS_CONFIG_PATH.exists():
         try:
@@ -1524,9 +1668,11 @@ channel_config = load_channel_config()
 sensors_config = load_sensors_config()
 actuator_manager = ActuatorManager(backend, channel_config)
 sensor_manager = SensorManager()
+sensor_manager.reload_config(sensors_config)
 automation_engine = AutomationEngine(actuator_manager, sensor_manager)
 alerts = AlertManager()
 app_state = AppState(actuator_manager, sensor_manager, automation_engine, alerts)
+lcd_manager = LCDManager(sensors_config)
 
 
 # Database
@@ -2405,6 +2551,7 @@ def sensor_loop() -> None:
             _check_sensor_health()
             _check_stale_and_fail_safe()
             _maybe_log_sensor_readings(readings)
+            lcd_manager.render_auto(api_status_payload(readings))
         except Exception as exc:
             alerts.add("error", f"Sensor loop error: {exc}")
         time.sleep(3)
@@ -2460,16 +2607,21 @@ def hardware() -> Any:
     return render_template("hardware.html")
 
 
+@app.route("/lcd")
+def lcd_page() -> Any:
+    return render_template("lcd.html")
+
+
 @app.route("/help")
 @app.route("/sss")
 def help_page() -> Any:
     return render_template("help.html")
 
 
-@app.route("/api/status")
-def api_status() -> Any:
+def api_status_payload(readings: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     latest = sensor_manager.latest()
-    readings = dict(latest.get("readings", {}))
+    if readings is None:
+        readings = dict(latest.get("readings", {}))
     dht_averages = sensor_manager.dht22_averages()
     if isinstance(readings.get("dht22"), dict):
         dht_reading = dict(readings["dht22"])
@@ -2490,7 +2642,7 @@ def api_status() -> Any:
     for name in actuator_manager.channels:
         if "PUMP" in name:
             cooldowns[name] = round(remaining, 1)
-    response = {
+    return {
         "timestamp": _timestamp(),
         "sensor_ts": sensor_ts,
         "data_age_sec": data_age_sec,
@@ -2508,7 +2660,13 @@ def api_status() -> Any:
         "safe_mode": app_state.safe_mode,
         "limits": app_state.limits,
         "automation": automation_engine.config,
+        "lcd": lcd_manager.status(),
     }
+
+
+@app.route("/api/status")
+def api_status() -> Any:
+    response = api_status_payload()
     return jsonify(response)
 
 
@@ -2843,6 +3001,7 @@ def api_config() -> Any:
         with SENSORS_CONFIG_PATH.open("w") as f:
             json.dump(sensors_config, f, indent=2)
         sensor_manager.reload_config(sensors_config)
+        lcd_manager.update_config(sensors_config)
     if safe_mode is not None:
         app_state.toggle_safe_mode(bool(safe_mode))
     actuator_manager.set_all_off("config_update")
@@ -2866,6 +3025,44 @@ def api_settings() -> Any:
     if alerts_config:
         app_state.update_alerts(alerts_config)
     return jsonify({"ok": True})
+
+
+@app.route("/api/lcd", methods=["GET", "POST"])
+def api_lcd() -> Any:
+    if request.method == "GET":
+        return jsonify({
+            "lcd": lcd_manager.status(),
+            "config": {
+                "lcd_enabled": sensors_config.get("lcd_enabled", True),
+                "lcd_addr": sensors_config.get("lcd_addr", "0x27"),
+                "lcd_port": sensors_config.get("lcd_port", 1),
+                "lcd_cols": sensors_config.get("lcd_cols", 20),
+                "lcd_rows": sensors_config.get("lcd_rows", 4),
+                "lcd_expander": sensors_config.get("lcd_expander", "PCF8574"),
+                "lcd_charmap": sensors_config.get("lcd_charmap", "A00"),
+                "lcd_mode": sensors_config.get("lcd_mode", "auto"),
+                "lcd_lines": sensors_config.get("lcd_lines", ["", "", "", ""]),
+            },
+        })
+    admin_error = require_admin()
+    if admin_error:
+        return admin_error
+    payload = request.get_json(force=True, silent=True) or {}
+    config_update = payload.get("config") or {}
+    lines = payload.get("lines")
+    if config_update:
+        sensors_config.update(config_update)
+        with SENSORS_CONFIG_PATH.open("w") as f:
+            json.dump(sensors_config, f, indent=2)
+        sensor_manager.reload_config(sensors_config)
+        lcd_manager.update_config(sensors_config)
+    if isinstance(lines, list):
+        lcd_manager.set_manual_lines([str(x) if x is not None else "" for x in lines])
+        sensors_config["lcd_mode"] = "manual"
+        sensors_config["lcd_lines"] = [str(x) if x is not None else "" for x in lines]
+        with SENSORS_CONFIG_PATH.open("w") as f:
+            json.dump(sensors_config, f, indent=2)
+    return jsonify({"ok": True, "lcd": lcd_manager.status()})
 
 
 # Test panel routes

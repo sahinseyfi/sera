@@ -2,5 +2,19 @@
   "dht22_gpio": 17,
   "bh1750_addr": "0x23",
   "ads1115_addr": "0x48",
-  "ds18b20_enabled": true
+  "ds18b20_enabled": false,
+  "lcd_enabled": true,
+  "lcd_addr": "0x27",
+  "lcd_port": 1,
+  "lcd_cols": 20,
+  "lcd_rows": 4,
+  "lcd_expander": "PCF8574",
+  "lcd_charmap": "A00",
+  "lcd_mode": "manual",
+  "lcd_lines": [
+    "SATIR 1",
+    "SATIR 2",
+    "SATIR 3",
+    "SATIR 4"
+  ]
 }
