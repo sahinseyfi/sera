@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Ayarlar sayfasinda tek kaydet duzeni",
+    "summary": "Admin token ve otomasyon dahil tum degisiklikler tek Kaydet ile kaydedilir.",
+    "details": [
+      "Admin token icin ayrica Kaydet/Temizle butonu kalmadi.",
+      "Tum ayarlar tek dugmede toplandi."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Ayarlar icin tek kaydet butonu birakildi",
     "summary": "Tum ayarlar tek Kaydet dugmesiyle kaydedilir hale geldi.",
     "details": [

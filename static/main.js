@@ -979,26 +979,6 @@ function initAdminToken() {
   const input = document.getElementById('adminTokenInput');
   if (!input) return;
   input.value = localStorage.getItem('adminToken') || '';
-  const saveBtn = document.getElementById('saveAdminToken');
-  const clearBtn = document.getElementById('clearAdminToken');
-  if (saveBtn) {
-    saveBtn.onclick = () => {
-      const value = input.value.trim();
-      if (value) {
-        localStorage.setItem('adminToken', value);
-      } else {
-        localStorage.removeItem('adminToken');
-      }
-      updateAdminTokenStatus();
-    };
-  }
-  if (clearBtn) {
-    clearBtn.onclick = () => {
-      localStorage.removeItem('adminToken');
-      input.value = '';
-      updateAdminTokenStatus();
-    };
-  }
   updateAdminTokenStatus();
 }
 
@@ -1029,6 +1009,16 @@ function bindCalibrationButtons() {
 }
 
 function saveSettings() {
+  const tokenInput = document.getElementById('adminTokenInput');
+  if (tokenInput) {
+    const value = tokenInput.value.trim();
+    if (value) {
+      localStorage.setItem('adminToken', value);
+    } else {
+      localStorage.removeItem('adminToken');
+    }
+    updateAdminTokenStatus();
+  }
   const heaterCutoffRaw = parseFloat(document.getElementById('heaterCutoff').value);
   const heaterCutoff = Number.isFinite(heaterCutoffRaw) ? heaterCutoffRaw : 0;
   const heaterTLowRaw = parseFloat(document.getElementById('heaterTLow').value);
