@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, time as dt_time, timezone
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
-from flask import Blueprint, Flask, Response, jsonify, redirect, render_template, request, url_for
+from flask import Flask, Response, jsonify, redirect, render_template, request, url_for
 
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_DIR = BASE_DIR / "config"
@@ -1095,7 +1095,7 @@ class AutomationEngine:
         reason = str(state.get("reason") or "")
         last_change = state.get("last_change_ts")
         manual_override_minutes = int(self.config.get("manual_override_minutes", 0) or 0)
-        if manual_override_minutes > 0 and reason in ("manual", "test_panel"):
+        if manual_override_minutes > 0 and reason == "manual":
             override_until = (last_change or time.time()) + manual_override_minutes * 60
             if last_change and time.time() < override_until:
                 self.manual_override_until_ts = override_until
@@ -1179,7 +1179,7 @@ class AutomationEngine:
         reason = str(state.get("reason") or "")
         last_change = state.get("last_change_ts")
         manual_override_minutes = int(self.config.get("fan_manual_override_minutes", 0) or 0)
-        if manual_override_minutes > 0 and reason in ("manual", "test_panel"):
+        if manual_override_minutes > 0 and reason == "manual":
             override_until = (last_change or time.time()) + manual_override_minutes * 60
             if last_change and time.time() < override_until:
                 self.fan_manual_override_until_ts = override_until
@@ -1220,7 +1220,7 @@ class AutomationEngine:
         reason = str(state.get("reason") or "")
         last_change = state.get("last_change_ts")
         manual_override_minutes = int(self.config.get("fan_manual_override_minutes", 0) or 0)
-        if manual_override_minutes > 0 and reason in ("manual", "test_panel"):
+        if manual_override_minutes > 0 and reason == "manual":
             override_until = (last_change or time.time()) + manual_override_minutes * 60
             if last_change and time.time() < override_until:
                 self.fan_manual_override_until_ts = override_until
@@ -1289,7 +1289,7 @@ class AutomationEngine:
         reason = str(state.get("reason") or "")
         last_change = state.get("last_change_ts")
         manual_override_minutes = int(self.config.get("heater_manual_override_minutes", 0) or 0)
-        if manual_override_minutes > 0 and reason in ("manual", "test_panel"):
+        if manual_override_minutes > 0 and reason == "manual":
             override_until = (last_change or time.time()) + manual_override_minutes * 60
             if last_change and time.time() < override_until:
                 self.heater_manual_override_until_ts = override_until
@@ -1359,7 +1359,7 @@ class AutomationEngine:
         reason = str(state.get("reason") or "")
         last_change = state.get("last_change_ts")
         manual_override_minutes = int(self.config.get("pump_manual_override_minutes", 0) or 0)
-        if manual_override_minutes > 0 and reason in ("manual", "test_panel"):
+        if manual_override_minutes > 0 and reason == "manual":
             override_until = (last_change or time.time()) + manual_override_minutes * 60
             if last_change and time.time() < override_until:
                 self.pump_manual_override_until_ts = override_until
@@ -1451,9 +1451,7 @@ class AppState:
         self.automation = automation
         self.alerts = alerts
         self.safe_mode = True
-        self.test_mode = False
         self.estop = False
-        self.pump_unlocked = False
         self.sensor_faults = {"pump": False, "heater": False}
         self.limits = dict(DEFAULT_LIMITS)
         self.alerts_config = dict(DEFAULT_ALERTS)
@@ -1484,26 +1482,12 @@ class AppState:
                     else:
                         self.alerts_config[key] = float(data[key])
 
-    def set_test_mode(self, enabled: bool) -> None:
-        with self.lock:
-            self.test_mode = bool(enabled)
-            if not enabled:
-                self.pump_unlocked = False
-        if not enabled:
-            self.actuator_manager.set_all_off("test_mode_off")
-
     def set_estop(self, enabled: bool) -> None:
         with self.lock:
             self.estop = bool(enabled)
-            if enabled:
-                self.pump_unlocked = False
         if enabled:
             self.actuator_manager.set_all_off("estop")
         log_event("system", "warning" if enabled else "info", f"E-STOP {'AÇIK' if enabled else 'KAPALI'}", None)
-
-    def set_pump_unlocked(self, enabled: bool) -> None:
-        with self.lock:
-            self.pump_unlocked = bool(enabled)
 
     def set_sensor_faults(self, pump: Optional[bool] = None, heater: Optional[bool] = None) -> None:
         with self.lock:
@@ -1520,25 +1504,8 @@ class AppState:
         with self.lock:
             return dict(self.alerts_config)
 
-    def test_panel_state(self) -> Dict[str, bool]:
-        with self.lock:
-            return {
-                "test_mode": self.test_mode,
-                "estop": self.estop,
-                "pump_unlocked": self.pump_unlocked,
-            }
-
-
 # Flask app factory
 app = Flask(__name__)
-test_panel = Blueprint(
-    "test_panel",
-    __name__,
-    template_folder=str(TEST_PANEL_DIR / "templates"),
-    static_folder=str(TEST_PANEL_DIR / "static"),
-    static_url_path="static",
-    url_prefix="/test",
-)
 backend = GPIOBackend()
 channel_config = []
 
@@ -2286,253 +2253,6 @@ def apply_actuator_command(name: str, desired_state: bool, seconds: Optional[int
 
 
 # Test panel helpers
-test_panel_i2c_state: Dict[str, Any] = {"found": [], "err": None, "ts": None}
-test_panel_i2c_lock = threading.Lock()
-
-
-def _infer_relay_type(name: str) -> str:
-    upper = name.upper()
-    if "PUMP" in upper:
-        return "pump"
-    if "HEATER" in upper:
-        return "heater"
-    if "FAN" in upper:
-        return "fan"
-    if "LIGHT" in upper:
-        return "light"
-    return "relay"
-
-
-def _relay_meta(name: str) -> Dict[str, Any]:
-    name = name.upper()
-    relay_type = _infer_relay_type(name)
-    locked = relay_type == "pump"
-    for chan in load_channel_config():
-        if chan.get("name", "").upper() == name:
-            relay_type = chan.get("type") or relay_type
-            if "locked" in chan:
-                locked = bool(chan["locked"])
-            else:
-                locked = relay_type == "pump"
-            break
-    return {"type": relay_type, "locked": locked}
-
-
-def _test_panel_config() -> Dict[str, Any]:
-    channels = load_channel_config()
-    relays: Dict[str, Any] = {}
-    for chan in channels:
-        name = chan["name"].upper()
-        relay_type = chan.get("type") or _infer_relay_type(name)
-        relay = {
-            "gpio": int(chan["gpio_pin"]),
-            "name": chan.get("description", name),
-            "type": relay_type,
-        }
-        if relay_type == "pump" or "locked" in chan:
-            relay["locked"] = bool(chan.get("locked", relay_type == "pump"))
-        relays[name] = relay
-    active_low = all(chan.get("active_low", False) for chan in channels) if channels else False
-    return {
-        "active_low": active_low,
-        "relays": relays,
-        "safety": {
-            "heater_max_on_sec": int(app_state.limits.get("heater_max_seconds", 300)),
-            "pump_max_on_sec": int(app_state.limits.get("pump_max_seconds", 15)),
-        },
-        "sensors": {
-            "dht22_gpio": int(os.getenv("DHT22_GPIO", "17")),
-            "ds18b20_enabled": True,
-            "dht22_enabled": sensor_manager.dht is not None,
-            "i2c_bus": 1,
-        },
-    }
-
-
-def _build_test_panel_relays() -> Dict[str, Any]:
-    channels = load_channel_config()
-    channel_map = {chan["name"].upper(): chan for chan in channels}
-    relays: Dict[str, Any] = {}
-    for name, info in actuator_manager.get_state().items():
-        chan = channel_map.get(name, {})
-        relay_type = chan.get("type") or _infer_relay_type(name)
-        locked = bool(chan.get("locked", relay_type == "pump"))
-        relays[name] = {
-            "name": info.get("description", name),
-            "gpio": info.get("gpio_pin"),
-            "type": relay_type,
-            "locked": locked,
-            "state": bool(info.get("state")),
-        }
-    return relays
-
-
-def _build_test_panel_sensors() -> Dict[str, Any]:
-    latest = sensor_manager.latest()
-    readings = latest.get("readings", {})
-    errors: List[Dict[str, Any]] = []
-    ok = True
-
-    def status_error(status: Optional[str]) -> Optional[str]:
-        if not status or status in ("ok", "simulated"):
-            return None
-        return str(status)
-
-    dht = readings.get("dht22", {})
-    dht_err = status_error(dht.get("status"))
-    if dht_err:
-        ok = False
-        errors.append({"where": "dht22", "msg": dht_err, "ts": dht.get("ts") or time.time()})
-
-    ds = readings.get("ds18b20", {})
-    ds_err = status_error(ds.get("status"))
-    if ds_err:
-        ok = False
-        errors.append({"where": "ds18b20", "msg": ds_err, "ts": ds.get("ts") or time.time()})
-    ds_sensors: List[Dict[str, Any]] = []
-    if ds.get("temperature") is not None:
-        try:
-            ds_sensors.append({"id": "ds18b20", "c": round(float(ds["temperature"]), 2)})
-        except Exception:
-            ds_sensors.append({"id": "ds18b20", "c": ds["temperature"]})
-
-    bh = readings.get("bh1750", {})
-    bh_err = status_error(bh.get("status"))
-    if bh_err:
-        ok = False
-        errors.append({"where": "bh1750", "msg": bh_err, "ts": bh.get("ts") or time.time()})
-
-    soil = readings.get("soil", {})
-    soil_err = status_error(soil.get("status"))
-    if soil_err:
-        ok = False
-        errors.append({"where": "ads1115", "msg": soil_err, "ts": soil.get("ts") or time.time()})
-
-    with test_panel_i2c_lock:
-        i2c_scan = dict(test_panel_i2c_state)
-
-    return {
-        "ok": ok,
-        "last_update": latest.get("ts"),
-        "errors": errors,
-        "bh1750": {"lux": bh.get("lux"), "err": bh_err, "ts": bh.get("ts")},
-        "ads1115": {
-            "a0": soil.get("ch0"),
-            "a1": soil.get("ch1"),
-            "a2": None,
-            "a3": None,
-            "err": soil_err,
-            "ts": soil.get("ts"),
-        },
-        "ds18b20": {"sensors": ds_sensors, "err": ds_err, "ts": ds.get("ts")},
-        "dht22": {"temp": dht.get("temperature"), "hum": dht.get("humidity"), "err": dht_err, "ts": dht.get("ts")},
-        "i2c_scan": i2c_scan,
-    }
-
-
-def _build_test_panel_status() -> Dict[str, Any]:
-    config = _test_panel_config()
-    relays = _build_test_panel_relays()
-    config.pop("relays", None)
-    return {
-        "time": time.time(),
-        "safety": app_state.test_panel_state(),
-        "safe_mode": app_state.safe_mode,
-        "config": config,
-        "relays": relays,
-        "sensors": _build_test_panel_sensors(),
-    }
-
-
-def _test_panel_can_switch(relay_type: str, locked: bool) -> tuple[bool, str]:
-    if app_state.estop:
-        return False, "E-STOP active"
-    if not app_state.test_mode:
-        return False, "Test mode disabled"
-    if app_state.safe_mode:
-        return False, "SAFE MODE active"
-    if relay_type == "pump" and locked and not app_state.pump_unlocked:
-        return False, "Pump locked; unlock required"
-    return True, "OK"
-
-
-def _apply_test_panel_config(payload: Dict[str, Any]) -> Optional[str]:
-    relays_payload = payload.get("relays", {})
-    if relays_payload and not isinstance(relays_payload, dict):
-        return "relays must be an object"
-
-    channels = load_channel_config()
-    channel_map = {chan["name"].upper(): chan for chan in channels}
-
-    for key, relay in (relays_payload or {}).items():
-        name = str(key).upper()
-        if name not in channel_map:
-            continue
-        try:
-            channel_map[name]["gpio_pin"] = int(relay.get("gpio", channel_map[name]["gpio_pin"]))
-        except Exception:
-            return f"{name} gpio must be a number"
-        if "type" in relay:
-            channel_map[name]["type"] = relay["type"]
-        if "locked" in relay:
-            channel_map[name]["locked"] = bool(relay["locked"])
-
-    if "active_low" in payload:
-        active_low = bool(payload["active_low"])
-        for chan in channel_map.values():
-            chan["active_low"] = active_low
-
-    updates: Dict[str, Any] = {}
-    safety = payload.get("safety", {})
-    if isinstance(safety, dict):
-        if "pump_max_on_sec" in safety:
-            updates["pump_max_seconds"] = int(safety["pump_max_on_sec"])
-        if "heater_max_on_sec" in safety:
-            updates["heater_max_seconds"] = int(safety["heater_max_on_sec"])
-    if updates:
-        app_state.update_limits(updates)
-
-    updated_channels = list(channel_map.values())
-    CONFIG_DIR.mkdir(exist_ok=True)
-    with CHANNEL_CONFIG_PATH.open("w") as f:
-        json.dump(updated_channels, f, indent=2)
-    actuator_manager.reload_channels(updated_channels)
-    return None
-
-
-def _test_panel_i2c_scan(bus_num: int = 1) -> Dict[str, Any]:
-    now = time.time()
-    found: List[str] = []
-    err = None
-    try:
-        from smbus2 import SMBus  # type: ignore
-
-        with SMBus(bus_num) as bus:
-            for addr in range(0x03, 0x78):
-                try:
-                    bus.write_quick(addr)
-                    found.append(hex(addr))
-                except Exception:
-                    pass
-    except Exception as exc:
-        try:
-            out = subprocess.check_output(["i2cdetect", "-y", str(bus_num)], text=True)
-            for line in out.splitlines():
-                if ":" not in line:
-                    continue
-                parts = line.split(":")[1].strip().split()
-                base = int(line.split(":")[0], 16)
-                for i, part in enumerate(parts):
-                    if part != "--":
-                        found.append(hex(base + i))
-        except Exception as exc2:
-            err = f"smbus2/i2cdetect fail: {exc} / {exc2}"
-
-    with test_panel_i2c_lock:
-        test_panel_i2c_state.update({"found": found, "err": err, "ts": now})
-        return dict(test_panel_i2c_state)
-
-
 # Background loops
 
 def _maybe_log_sensor_readings(readings: Dict[str, Any]) -> None:
@@ -3062,125 +2782,6 @@ def api_lcd() -> Any:
         with SENSORS_CONFIG_PATH.open("w") as f:
             json.dump(sensors_config, f, indent=2)
     return jsonify({"ok": True, "lcd": lcd_manager.status()})
-
-
-# Test panel routes
-@test_panel.route("/")
-def test_panel_index() -> Any:
-    return render_template("index.html")
-
-
-@test_panel.route("/api/status")
-def test_panel_status() -> Any:
-    return jsonify(_build_test_panel_status())
-
-
-@test_panel.route("/api/safety", methods=["POST"])
-def test_panel_safety() -> Any:
-    admin_error = require_admin()
-    if admin_error:
-        return admin_error
-    payload = request.get_json(force=True, silent=True) or {}
-    if "test_mode" in payload:
-        app_state.set_test_mode(bool(payload["test_mode"]))
-    if "estop" in payload:
-        app_state.set_estop(bool(payload["estop"]))
-    if "pump_unlocked" in payload:
-        app_state.set_pump_unlocked(bool(payload["pump_unlocked"]))
-    return jsonify({"ok": True, "safety": app_state.test_panel_state()})
-
-
-@test_panel.route("/api/relay/<relay_key>", methods=["POST"])
-def test_panel_relay(relay_key: str) -> Any:
-    admin_error = require_admin()
-    if admin_error:
-        return admin_error
-    name = relay_key.upper()
-    if name not in actuator_manager.channels:
-        return jsonify({"ok": False, "error": "relay_key not found"}), 404
-
-    payload = request.get_json(force=True, silent=True) or {}
-    action = payload.get("action", "")
-
-    if action == "off":
-        actuator_manager.set_state(name, False, "test_panel")
-        log_actuation(name, False, "test_panel", None)
-        return jsonify({"ok": True, "state": actuator_manager.get_state().get(name)})
-
-    if action not in ("on", "pulse"):
-        return jsonify({"ok": False, "error": "unknown action"}), 400
-
-    meta = _relay_meta(name)
-    ok, msg = _test_panel_can_switch(meta["type"], meta["locked"])
-    if not ok:
-        return jsonify({"ok": False, "error": msg}), 400
-
-    seconds = None
-    if action == "pulse":
-        try:
-            seconds = int(payload.get("sec", 2))
-        except Exception:
-            return jsonify({"ok": False, "error": "sec must be a number"}), 400
-        seconds = max(1, min(seconds, 15))
-    elif meta["type"] == "pump":
-        seconds = int(app_state.limits.get("pump_max_seconds", 15))
-    elif meta["type"] == "heater":
-        seconds = int(app_state.limits.get("heater_max_seconds", 300))
-
-    if seconds is not None and meta["type"] == "pump":
-        seconds = min(seconds, int(app_state.limits.get("pump_max_seconds", 15)))
-    if seconds is not None and meta["type"] == "heater":
-        seconds = min(seconds, int(app_state.limits.get("heater_max_seconds", 300)))
-
-    try:
-        apply_actuator_command(name, True, seconds, "test_panel")
-        return jsonify({"ok": True, "state": actuator_manager.get_state().get(name)})
-    except ActuationError as exc:
-        return jsonify({"ok": False, "error": str(exc)}), 400
-
-
-@test_panel.route("/api/config", methods=["GET", "POST"])
-def test_panel_config() -> Any:
-    if request.method == "GET":
-        return jsonify(_test_panel_config())
-
-    admin_error = require_admin()
-    if admin_error:
-        return admin_error
-    payload = request.get_json(force=True, silent=True) or {}
-    if not isinstance(payload, dict):
-        return jsonify({"ok": False, "error": "invalid json"}), 400
-    err = _apply_test_panel_config(payload)
-    if err:
-        return jsonify({"ok": False, "error": err}), 400
-    return jsonify({"ok": True})
-
-
-@test_panel.route("/api/i2c-scan", methods=["POST"])
-def test_panel_i2c_scan() -> Any:
-    admin_error = require_admin()
-    if admin_error:
-        return admin_error
-    payload = request.get_json(force=True, silent=True) or {}
-    try:
-        bus_num = int(payload.get("bus_num", 1))
-    except Exception:
-        return jsonify({"ok": False, "error": "bus_num must be a number"}), 400
-    result = _test_panel_i2c_scan(bus_num)
-    return jsonify({"ok": True, "result": result})
-
-
-@test_panel.route("/api/all-off", methods=["POST"])
-def test_panel_all_off() -> Any:
-    admin_error = require_admin()
-    if admin_error:
-        return admin_error
-    actuator_manager.set_all_off("test_panel_all_off")
-    log_actuation("ALL", False, "test_panel_all_off", None)
-    return jsonify({"ok": True})
-
-
-app.register_blueprint(test_panel)
 
 
 # Templates for testing convenience
