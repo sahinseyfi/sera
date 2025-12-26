@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "LCD kutuphanesi kuruldu",
+    "summary": "LCD yazdirma icin gerekli RPLCD kutuphanesi eklendi.",
+    "details": [
+      "LCD komutlari artik donanima yazilabilir.",
+      "LCD testi icin metin gonderilebilir."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "LCD I2C adresi 0x27 olarak ayarlandi",
     "summary": "LCD adresi I2C taramasindaki cihaza gore duzeltildi.",
     "details": [
