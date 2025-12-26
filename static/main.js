@@ -615,11 +615,11 @@ window.renderControl = function(data) {
             ${pumpNote ? `<div class="small text-secondary">${pumpNote}</div>` : ''}
             ${pumpLocked ? '<div class="small text-danger">Pompa kilitli: sensör hatası.</div>' : ''}
           </div>
-          <div class="d-flex gap-2 align-items-center mt-auto">
+          <div class="d-flex gap-2 align-items-center flex-wrap mt-auto">
             <input class="form-control form-control-sm w-25" data-field="sec" type="number" min="1" placeholder="sn">
             <button class="btn btn-success flex-fill" data-action="on">Aç</button>
             <button class="btn btn-outline-info flex-fill" data-action="pulse">Süreli</button>
-            <button class="btn btn-outline-light flex-fill" data-action="off">Kapat</button>
+            <button class="btn btn-outline-secondary flex-fill" data-action="off">Kapat</button>
           </div>
         </div>
       </div>`;
