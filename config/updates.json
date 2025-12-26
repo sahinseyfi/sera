@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Grafik alt etiketleri siklastirildi",
+    "summary": "Zaman etiketleri daha sik gorunerek grafikleri okumak kolaylasti.",
+    "details": [
+      "Genis ekranda daha fazla saat etiketi gosterilir.",
+      "Mobilde kalabalik olmamasi icin etiket sayisi otomatik ayarlanir."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Olay gunlugunde pasif donanimlar gizlendi",
     "summary": "Disabled olan cikislar artik olay gunlugunde gorunmuyor.",
     "details": [

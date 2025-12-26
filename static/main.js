@@ -820,15 +820,14 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
   ctx.fillStyle = timeLabelColor;
   ctx.textBaseline = 'top';
   if (points.length >= 2) {
-    const firstTs = points[0][0];
-    const midTs = points[Math.floor(points.length / 2)][0];
-    const lastTs = points[points.length - 1][0];
-    ctx.textAlign = 'left';
-    ctx.fillText(formatUnixSeconds(firstTs), pad, timeLabelY);
-    ctx.textAlign = 'center';
-    ctx.fillText(formatUnixSeconds(midTs), pad + plotW / 2, timeLabelY);
-    ctx.textAlign = 'right';
-    ctx.fillText(formatUnixSeconds(lastTs), pad + plotW, timeLabelY);
+    const labelCount = Math.max(3, Math.min(6, Math.floor(plotW / 140)));
+    for (let i = 0; i < labelCount; i += 1) {
+      const idx = Math.round((points.length - 1) * (i / (labelCount - 1)));
+      const ts = points[idx][0];
+      const x = pad + (plotW * (i / (labelCount - 1)));
+      ctx.textAlign = i === 0 ? 'left' : (i === labelCount - 1 ? 'right' : 'center');
+      ctx.fillText(formatUnixSeconds(ts), x, timeLabelY);
+    }
   }
 
   if (points.length < 2) {
