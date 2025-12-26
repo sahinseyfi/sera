@@ -2417,6 +2417,18 @@ def api_sensor_log() -> Any:
     if order not in ("asc", "desc"):
         return jsonify({"error": "order must be asc|desc"}), 400
 
+    interval_raw = (request.args.get("interval") or "").strip()
+    interval_minutes: Optional[int] = None
+    if interval_raw:
+        try:
+            interval_minutes = int(interval_raw)
+        except ValueError:
+            return jsonify({"error": "interval must be integer minutes"}), 400
+        if interval_minutes <= 0:
+            interval_minutes = None
+        elif interval_minutes not in (1, 5, 15, 30, 60):
+            return jsonify({"error": "interval must be one of 1,5,15,30,60"}), 400
+
     if to_ts is None:
         to_ts = time.time()
     if from_ts is None:
@@ -2426,17 +2438,41 @@ def api_sensor_log() -> Any:
 
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
-    cur.execute(
-        f"""
-        SELECT ts, dht_temp, dht_hum, ds18_temp, lux, soil_ch0, soil_ch1, soil_ch2, soil_ch3
-        FROM sensor_log
-        WHERE ts >= ? AND ts <= ?
-        ORDER BY ts {order.upper()}
-        LIMIT ?
-        """,
-        (from_ts, to_ts, limit),
-    )
-    rows = cur.fetchall()
+    interval_sec = interval_minutes * 60 if interval_minutes else None
+    if interval_sec:
+        cur.execute(
+            f"""
+            SELECT
+                CAST(ts / ? AS INTEGER) * ? AS bucket,
+                AVG(dht_temp),
+                AVG(dht_hum),
+                AVG(ds18_temp),
+                AVG(lux),
+                AVG(soil_ch0),
+                AVG(soil_ch1),
+                AVG(soil_ch2),
+                AVG(soil_ch3)
+            FROM sensor_log
+            WHERE ts >= ? AND ts <= ?
+            GROUP BY bucket
+            ORDER BY bucket {order.upper()}
+            LIMIT ?
+            """,
+            (interval_sec, interval_sec, from_ts, to_ts, limit),
+        )
+        rows = cur.fetchall()
+    else:
+        cur.execute(
+            f"""
+            SELECT ts, dht_temp, dht_hum, ds18_temp, lux, soil_ch0, soil_ch1, soil_ch2, soil_ch3
+            FROM sensor_log
+            WHERE ts >= ? AND ts <= ?
+            ORDER BY ts {order.upper()}
+            LIMIT ?
+            """,
+            (from_ts, to_ts, limit),
+        )
+        rows = cur.fetchall()
     conn.close()
 
     if request.args.get("format") == "csv":
@@ -2475,7 +2511,13 @@ def api_sensor_log() -> Any:
         }
         for row in rows
     ]
-    return jsonify({"from_ts": from_ts, "to_ts": to_ts, "order": order, "rows": payload})
+    return jsonify({
+        "from_ts": from_ts,
+        "to_ts": to_ts,
+        "order": order,
+        "interval_sec": interval_sec,
+        "rows": payload,
+    })
 
 
 @app.route("/api/sensor_log/clear", methods=["POST"])

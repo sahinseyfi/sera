@@ -1191,15 +1191,18 @@ function sensorLogQuery() {
   const fromEl = document.getElementById('sensorLogFrom');
   const toEl = document.getElementById('sensorLogTo');
   const limitEl = document.getElementById('sensorLogLimit');
+  const intervalEl = document.getElementById('sensorLogInterval');
   const orderEl = document.getElementById('sensorLogOrder');
   const from = ((fromEl && fromEl.value) || '').trim();
   const to = ((toEl && toEl.value) || '').trim();
   const limit = ((limitEl && limitEl.value) || '200').trim();
+  const interval = ((intervalEl && intervalEl.value) || '').trim();
   const order = ((orderEl && orderEl.value) || 'desc').trim();
   const params = new URLSearchParams();
   if (from) params.set('from', from);
   if (to) params.set('to', to);
   if (limit) params.set('limit', limit);
+  if (interval) params.set('interval', interval);
   if (order) params.set('order', order);
   return params;
 }
@@ -1258,7 +1261,9 @@ function refreshSensorLog() {
       if (updated) updated.textContent = `Güncelleme: ${new Date().toLocaleTimeString()}`;
       const note = document.getElementById('sensorLogNote');
       const count = data.rows ? data.rows.length : 0;
-      if (note) note.textContent = `SQLite: ${count} satır · CSV: data/sensor_logs/`;
+      const intervalSec = data.interval_sec || 0;
+      const intervalLabel = intervalSec ? `${Math.round(intervalSec / 60)} dk ort.` : 'ham';
+      if (note) note.textContent = `SQLite: ${count} satır · ${intervalLabel} · CSV: data/sensor_logs/`;
     })
     .catch(() => {});
 }
@@ -1293,10 +1298,12 @@ window.initLogs = function() {
   const order = document.getElementById('sensorLogOrder');
   const from = document.getElementById('sensorLogFrom');
   const to = document.getElementById('sensorLogTo');
-  [limit, order, from, to].forEach(el => {
+  const interval = document.getElementById('sensorLogInterval');
+  [limit, order, from, to, interval].forEach(el => {
     if (!el) return;
     el.addEventListener('change', () => {
       updateSensorLogDownloadLink();
+      refreshSensorLog();
     });
   });
   updateSensorLogDownloadLink();

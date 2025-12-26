@@ -36,6 +36,17 @@
         <input class="form-control form-control-sm" id="sensorLogLimit" type="number" min="1" max="2000" value="200">
       </div>
       <div>
+        <label class="form-label small text-secondary mb-1">Aralık</label>
+        <select class="form-select form-select-sm" id="sensorLogInterval">
+          <option value="">Ham</option>
+          <option value="1">1 dk</option>
+          <option value="5">5 dk</option>
+          <option value="15">15 dk</option>
+          <option value="30">30 dk</option>
+          <option value="60">1 saat</option>
+        </select>
+      </div>
+      <div>
         <label class="form-label small text-secondary mb-1">Sıra</label>
         <select class="form-select form-select-sm" id="sensorLogOrder">
           <option value="desc" selected>Yeni → Eski</option>
