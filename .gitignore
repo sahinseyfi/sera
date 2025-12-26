@@ -19,4 +19,10 @@ data/
 .gitconfig
 .lesshst
 .sudo_as_admin_successful
+*.log
+*.bak
+*.bak2
+*.bak3
+*.bak_*
+moisture_log.csv
 .env
