@@ -1395,10 +1395,43 @@ window.initHardware = function() {
   state.poller = setInterval(poll, 4000);
   const refreshBtn = document.getElementById('hardwareRefresh');
   if (refreshBtn) refreshBtn.onclick = poll;
+  const addBtn = document.getElementById('addHardwareRow');
+  if (addBtn) addBtn.onclick = addHardwareRow;
   const saveBtn = document.getElementById('saveHardware');
   if (saveBtn) saveBtn.onclick = saveHardware;
   fetchHardwareConfig();
 };
+
+function addHardwareRow() {
+  const body = document.querySelector('#hardwareTable tbody');
+  if (!body) return;
+  const roleOptions = [
+    { value: 'light', label: 'Light' },
+    { value: 'fan', label: 'Fan' },
+    { value: 'heater', label: 'Heater' },
+    { value: 'pump', label: 'Pump' },
+    { value: 'other', label: 'Other' },
+  ];
+  const roleSelect = `
+    <select class="form-select form-select-sm" data-field="role">
+      ${roleOptions.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join('')}
+    </select>
+  `;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input class="form-control form-control-sm" data-field="name" value=""></td>
+    <td class="text-center"><input class="form-check-input" data-field="enabled" type="checkbox" checked></td>
+    <td>${roleSelect}</td>
+    <td><input class="form-control form-control-sm" data-field="gpio_pin" type="number" value=""></td>
+    <td class="text-center"><input class="form-check-input" data-field="active_low" type="checkbox" checked></td>
+    <td><input class="form-control form-control-sm" data-field="description" value=""></td>
+    <td><input class="form-control form-control-sm" data-field="power_w" type="number" step="0.1" value=""></td>
+    <td><input class="form-control form-control-sm" data-field="quantity" type="number" step="1" value="1"></td>
+    <td class="small text-secondary">0.0 W</td>
+    <td><input class="form-control form-control-sm" data-field="voltage_v" type="number" step="0.1" value=""></td>
+    <td><input class="form-control form-control-sm" data-field="notes" value=""></td>`;
+  body.appendChild(tr);
+}
 
 window.renderHardware = function(data) {
   const body = document.querySelector('#hardwareTable tbody');
