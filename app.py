@@ -2592,11 +2592,6 @@ def settings() -> Any:
     return render_template("settings.html")
 
 
-@app.route("/pins")
-def pins() -> Any:
-    return render_template("pins.html")
-
-
 @app.route("/logs")
 def logs() -> Any:
     return render_template("logs.html")
@@ -2963,7 +2958,6 @@ def api_emergency_stop() -> Any:
 
 
 @app.route("/api/config", methods=["GET", "POST"])
-@app.route("/api/pins", methods=["GET", "POST"])
 def api_config() -> Any:
     admin_error = require_admin()
     if admin_error:
@@ -3006,6 +3000,11 @@ def api_config() -> Any:
         app_state.toggle_safe_mode(bool(safe_mode))
     actuator_manager.set_all_off("config_update")
     return jsonify({"ok": True})
+
+
+@app.route("/api/pins", methods=["GET", "POST"])
+def api_pins_deprecated() -> Any:
+    return jsonify({"error": "pins page removed, use /hardware"}), 410
 
 
 @app.route("/api/settings", methods=["POST"])
