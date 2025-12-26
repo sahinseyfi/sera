@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "LCD I2C adresi 0x27 olarak ayarlandi",
+    "summary": "LCD adresi I2C taramasindaki cihaza gore duzeltildi.",
+    "details": [
+      "I2C taramasinda 0x27 gorundugu icin LCD adresi buna cekildi.",
+      "LCD calismasi icin dogru adres kullanildi."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Donanim tablosuna ekle butonu geldi",
     "summary": "Donanim listesine yeni satir ekleyip kaydedebilirsin.",
     "details": [
