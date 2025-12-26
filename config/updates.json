@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Ayarlar icin kaydet butonu belirginlestirildi",
+    "summary": "SAFE MODE ve diger ayarlar icin ustte de Kaydet butonu var.",
+    "details": [
+      "SAFE MODE anahtari degisince ayarlar otomatik kaydedilir.",
+      "Kayit basarisizsa ekranda hata mesaji gorunur."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Kontrol sayfasinda eksik roleler tamamlandi",
     "summary": "Tum roleler kontrol ekraninda gorunur hale getirildi.",
     "details": [

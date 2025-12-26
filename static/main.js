@@ -1006,6 +1006,14 @@ window.initSettings = function() {
   poll();
   state.poller = setInterval(poll, 2500);
   document.getElementById('saveSettings').onclick = saveSettings;
+  const saveTop = document.getElementById('saveSettingsTop');
+  if (saveTop) saveTop.onclick = saveSettings;
+  const safeToggle = document.getElementById('safeModeToggle');
+  if (safeToggle) {
+    safeToggle.onchange = () => {
+      saveSettings();
+    };
+  }
   initAdminToken();
   bindCalibrationButtons();
 };
@@ -1136,7 +1144,15 @@ function saveSettings() {
     method: 'POST',
     headers: adminHeaders(),
     body: JSON.stringify(payload),
-  }).then(r => r.json()).then(() => poll());
+  }).then(async r => {
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const msg = body.error || 'Ayar kaydi basarisiz.';
+      alert(msg);
+      return;
+    }
+    poll();
+  });
 }
 
 window.renderSettings = function(data) {
