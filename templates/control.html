@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <p class="text-secondary mb-1">MVP-2 Güvenli Manuel Kontrol</p>
+    <h2 class="mb-0">Aktüatörler</h2>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-outline-light" id="refreshNow">Yenile</button>
+    <button class="btn btn-danger" id="emergencyStop">Acil Durdur</button>
+  </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <h6 class="mb-1">Bu sayfa ne işe yarar?</h6>
+  <div class="small text-secondary">
+    Röleleri güvenli şekilde aç/kapat. Pompa komutları süreli çalışır ve cooldown uygular.
+    SAFE MODE açıkken manuel komutlar kilitlidir. Detay: <a href="/help#hKontrol">Yardım/SSS</a>.
+  </div>
+</div></div>
+
+<div id="controlBanner" class="mb-3"></div>
+
+<div id="controlCards" class="row g-3"></div>
+
+<div class="card mt-3"><div class="card-body">
+  <h6>Pompa Süreli Çalıştırma</h6>
+  <div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-outline-info pump-preset" data-seconds="3">3s</button>
+    <button class="btn btn-outline-info pump-preset" data-seconds="5">5s</button>
+    <button class="btn btn-outline-info pump-preset" data-seconds="10">10s</button>
+  </div>
+  <div class="small text-secondary mt-2" id="pumpCooldownInfo">Pompa durumu: --</div>
+</div></div>
+
+<script>window.initControl && window.initControl();</script>
+{% endblock %}

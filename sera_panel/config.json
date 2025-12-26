@@ -1,0 +1,86 @@
+{
+  "active_low": true,
+  "channels": {
+    "R1_LIGHT_K1A": {
+      "active_low": true,
+      "description": "Kat1 Işık A",
+      "gpio_pin": 5,
+      "safe_default": "off"
+    },
+    "R2_LIGHT_K1B": {
+      "active_low": true,
+      "description": "Kat1 Işık B",
+      "gpio_pin": 6,
+      "safe_default": "off"
+    },
+    "R3_PUMP": {
+      "active_low": true,
+      "description": "Pompa",
+      "gpio_pin": 13,
+      "safe_default": "off"
+    },
+    "R4_HEATER": {
+      "active_low": true,
+      "description": "Isıtıcı",
+      "gpio_pin": 19,
+      "safe_default": "off"
+    },
+    "R5_FAN": {
+      "active_low": true,
+      "description": "Fan",
+      "gpio_pin": 26,
+      "safe_default": "off"
+    },
+    "R6_POT_FAN": {
+      "active_low": true,
+      "description": "Saksı Fanı",
+      "gpio_pin": 21,
+      "safe_default": "off"
+    }
+  },
+  "channels_file": "config/channels.json",
+  "relays": {
+    "heater_fan": {
+      "gpio": 18,
+      "name": "Röle 1 (ısıtıcı+fan)",
+      "type": "heater"
+    },
+    "level3_fan": {
+      "gpio": 25,
+      "name": "Röle 4 (3.kat fanı)",
+      "type": "fan"
+    },
+    "light_back": {
+      "gpio": 21,
+      "name": "Röle 6 (3.kat arka ışık)",
+      "type": "light"
+    },
+    "light_mid": {
+      "gpio": 20,
+      "name": "Röle 5 (3.kat orta ışık)",
+      "type": "light"
+    },
+    "pump": {
+      "gpio": 24,
+      "locked": true,
+      "name": "Röle 3 (pompa)",
+      "type": "pump"
+    },
+    "vent_fan": {
+      "gpio": 23,
+      "name": "Röle 2 (12cm havalandırma fanı)",
+      "type": "fan"
+    }
+  },
+  "safety": {
+    "heater_max_on_sec": 10,
+    "pump_max_on_sec": 3
+  },
+  "sensors": {
+    "dht22_enabled": false,
+    "dht22_gpio": 17,
+    "ds18b20_enabled": true,
+    "i2c_bus": 1
+  },
+  "test_mode_default": false
+}

@@ -1,0 +1,15 @@
+[Unit]
+Description=AKILLI SERA Web Panel
+After=network.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/akilli-sera
+Environment="SIMULATION_MODE=0"
+Environment="ADMIN_TOKEN=changeme"
+ExecStart=/home/pi/akilli-sera/venv/bin/python app.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

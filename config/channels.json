@@ -1,0 +1,8 @@
+[
+  {"name": "R1_LIGHT_K1A", "gpio_pin": 21, "active_low": true, "description": "LED Bar"},
+  {"name": "R2_LIGHT_K1B", "gpio_pin": 20, "active_low": true, "description": "LED Bar 2"},
+  {"name": "R3_PUMP", "gpio_pin": 16, "active_low": true, "description": "Pompa"},
+  {"name": "R4_HEATER", "gpio_pin": 12, "active_low": true, "description": "Isıtıcı"},
+  {"name": "R5_FAN", "gpio_pin": 7, "active_low": true, "description": "Fan"},
+  {"name": "R6_POT_FAN", "gpio_pin": 8, "active_low": true, "description": "Pot Fan"}
+]

@@ -1,0 +1,252 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="hero p-3 rounded-4 mb-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <div>
+      <p class="text-secondary mb-1">MVP-1 İzleme</p>
+      <h2 class="mb-0">Anlık Sensör Değerleri</h2>
+    </div>
+    <div class="text-end">
+      <div class="badge-soft" id="automationBadge">Otomasyon Kapalı</div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <div class="d-flex justify-content-between align-items-center gap-2">
+    <div>
+      <h6 class="mb-1">Bu sayfa ne işe yarar?</h6>
+      <div class="small text-secondary">
+        Anlık sensör değerleri, otomasyon özeti, grafikler ve uyarıları burada görürsün.
+        Daha fazla bilgi için <a href="/help#hDashboard">Yardım/SSS</a>.
+      </div>
+    </div>
+  </div>
+</div></div>
+
+<div id="statusBanner" class="mb-3"></div>
+
+<div class="card mb-3" id="automationCard"><div class="card-body">
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-2">
+    <div>
+      <div class="d-flex align-items-center">
+        <h6 class="card-title mb-1">Otomasyon Durumu</h6>
+        <span id="autoTargetBadge" class="badge text-bg-success ms-2 d-none">Hedef Tamam</span>
+      </div>
+      <div class="small text-secondary" id="autoSummary">--</div>
+    </div>
+    <div class="d-flex flex-wrap gap-3">
+      <div class="small">OK dk: <span id="autoOkMinutes">--</span> / <span id="autoTargetMinutes">--</span></div>
+      <div class="small">Kalan: <span id="autoRemainingMinutes">--</span></div>
+      <div class="small">Pencere: <span id="autoWindowState">--</span></div>
+      <div class="small">Reset: <span id="autoResetTime">--</span></div>
+      <div class="small">Override: <span id="autoOverrideState">--</span></div>
+      <div class="small">Blok: <span id="autoBlockState">--</span></div>
+      <div class="small">Min Kapalı: <span id="autoMinOffState">--</span></div>
+      <div class="small">Son kapanma: <span id="autoLastOffReason">--</span></div>
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 small text-secondary mt-2">
+    <span class="badge text-bg-success">Aktif (pencere içinde)</span>
+    <span class="badge text-bg-warning">Override / Blok</span>
+    <span class="badge text-bg-danger">Lux hatası</span>
+    <span class="badge text-bg-info">Lux max / Min kapalı</span>
+    <span class="badge text-bg-secondary">Kapalı</span>
+  </div>
+</div></div>
+
+<div class="row g-3">
+  <div class="col-md-3">
+    <div class="card h-100"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <h6 class="card-title mb-0">DHT22 Ortam</h6>
+        <span id="dhtStatus" class="badge text-bg-secondary">--</span>
+      </div>
+      <p class="mb-1">Sıcaklık: <span id="dhtTemp">--</span> °C</p>
+      <p class="mb-0">Nem: <span id="dhtHum">--</span> %</p>
+      <div class="small text-secondary mt-2">
+        <div>1 dk ort: <span id="dhtAvg1m">--</span></div>
+        <div>5 dk ort: <span id="dhtAvg5m">--</span></div>
+        <div>30 dk ort: <span id="dhtAvg30m">--</span></div>
+      </div>
+    </div></div>
+  </div>
+  <div class="col-md-3">
+    <div class="card h-100"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <h6 class="card-title mb-0">DS18B20 (Toprak/Su)</h6>
+        <span id="dsStatus" class="badge text-bg-secondary">--</span>
+      </div>
+      <p class="mb-0">Sıcaklık: <span id="dsTemp">--</span> °C</p>
+    </div></div>
+  </div>
+  <div class="col-md-3">
+    <div class="card h-100"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <h6 class="card-title mb-0">BH1750 Lux</h6>
+        <span id="luxStatus" class="badge text-bg-secondary">--</span>
+      </div>
+      <p class="mb-0">Lux: <span id="luxValue">--</span></p>
+    </div></div>
+  </div>
+  <div class="col-md-3">
+    <div class="card h-100"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <h6 class="card-title mb-0">Toprak Nem (ADS1115)</h6>
+        <span id="soilStatus" class="badge text-bg-secondary">--</span>
+      </div>
+      <p class="mb-1">CH0: <span id="soil0">--</span></p>
+      <p class="mb-1">CH1: <span id="soil1">--</span></p>
+      <p class="mb-1">CH2: <span id="soil2">--</span></p>
+      <p class="mb-0">CH3: <span id="soil3">--</span></p>
+    </div></div>
+  </div>
+</div>
+
+<div class="card mt-3"><div class="card-body">
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-2">
+    <div>
+      <h6 class="card-title mb-1">Grafikler</h6>
+      <div class="small text-secondary" id="historyRangeLabel">Son 24 saat</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <select class="form-select form-select-sm" id="historyMetric">
+        <option value="dht_temp">DHT22 Sıcaklık</option>
+        <option value="dht_hum">DHT22 Nem</option>
+        <option value="ds18_temp">DS18B20 Sıcaklık</option>
+        <option value="lux">Lux</option>
+        <option value="soil_ch0">Toprak CH0</option>
+        <option value="soil_ch1">Toprak CH1</option>
+        <option value="soil_ch2">Toprak CH2</option>
+        <option value="soil_ch3">Toprak CH3</option>
+      </select>
+      <div class="btn-group btn-group-sm" role="group">
+        <button class="btn btn-outline-secondary active" type="button" data-history-range="24h">24 saat</button>
+        <button class="btn btn-outline-secondary" type="button" data-history-range="7d">7 gün</button>
+      </div>
+      <a class="btn btn-outline-secondary btn-sm" id="historyDownload" href="#" download>CSV</a>
+    </div>
+  </div>
+  <div class="history-chart-wrap mt-3">
+    <canvas id="historyChart"></canvas>
+    <div id="historyEmpty" class="history-empty d-none">Veri yok</div>
+  </div>
+  <div class="d-flex flex-wrap gap-3 small text-secondary mt-2">
+    <div>Min: <span id="historyMin">--</span></div>
+    <div>Max: <span id="historyMax">--</span></div>
+    <div>Son: <span id="historyLast">--</span></div>
+    <div>Örnek: <span id="historyCount">--</span></div>
+    <div>Güncelleme: <span id="historyUpdated">--</span></div>
+  </div>
+</div></div>
+
+<div class="row g-3 mt-1">
+  <div class="col-md-6">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="card-title">Aktüatör Durumu</h6>
+      <div id="actuatorList" class="d-flex flex-wrap gap-2"></div>
+    </div></div>
+  </div>
+  <div class="col-md-6">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="card-title">Uyarılar</h6>
+      <div id="alerts" class="small"></div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-lg-6">
+    <div class="card h-100"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <h6 class="card-title mb-1">Enerji Tahmini</h6>
+          <div class="small text-secondary">Süreli komut kayıtlarından</div>
+        </div>
+        <small class="text-secondary" id="energyNote"></small>
+      </div>
+      <div class="d-flex flex-wrap gap-4 mb-3">
+        <div>
+          <div class="small text-secondary">Son 24 saat</div>
+          <div class="fw-semibold" id="energyTotal24h">--</div>
+        </div>
+        <div>
+          <div class="small text-secondary">Son 7 gün</div>
+          <div class="fw-semibold" id="energyTotal7d">--</div>
+        </div>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="small text-secondary mb-1">24 saat kanallar</div>
+          <div id="energyList24h" class="small"></div>
+        </div>
+        <div class="col-md-6">
+          <div class="small text-secondary mb-1">7 gün kanallar</div>
+          <div id="energyList7d" class="small"></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100"><div class="card-body">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <h6 class="card-title mb-1">Sensör Sağlığı</h6>
+          <div class="small text-secondary">Son OK ve offline süreleri</div>
+        </div>
+        <small class="text-secondary" id="sensorHealthNote">--</small>
+      </div>
+      <div id="sensorHealthList" class="small"></div>
+    </div></div>
+  </div>
+</div>
+
+<div class="card mt-3"><div class="card-body">
+  <div class="d-flex justify-content-between align-items-center">
+    <h6 class="card-title mb-0">Olay Günlüğü</h6>
+    <small class="text-secondary" id="eventLogUpdated">--</small>
+  </div>
+  <div id="eventLog" class="small mt-2"></div>
+</div></div>
+<style>
+  .history-chart-wrap {
+    position: relative;
+    height: 240px;
+  }
+  .history-chart-wrap canvas {
+    width: 100%;
+    height: 100%;
+  }
+  .history-empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    background: rgba(248, 250, 252, 0.65);
+  }
+  .event-item {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    align-items: center;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .event-item:last-child { border-bottom: none; }
+  .energy-item,
+  .health-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .energy-item:last-child,
+  .health-item:last-child { border-bottom: none; }
+</style>
+<script>window.initDashboard && window.initDashboard();</script>
+{% endblock %}

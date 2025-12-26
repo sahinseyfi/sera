@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AKILLI SERA – Test Paneli</title>
+  <link rel="stylesheet" href="{{ url_for('test_panel.static', filename='style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="title">AKILLI SERA – Test Paneli</div>
+      <div class="subtitle">GPIO / Sensör / Röle kontrol & teşhis</div>
+    </div>
+    <div class="top-actions">
+      <a class="btn" href="/dashboard">Ana Panel</a>
+      <label class="switch">
+        <input id="testMode" type="checkbox">
+        <span class="slider"></span>
+      </label>
+      <span class="label">Test Modu</span>
+
+      <button class="btn danger" id="estopBtn">E-STOP</button>
+      <button class="btn" id="allOffBtn">Hepsi OFF</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="grid">
+      <div class="card">
+        <h3>Durum</h3>
+        <div class="kv">
+          <div>Backend</div><div id="backendOk">—</div>
+          <div>Zaman</div><div id="nowTs">—</div>
+          <div>SAFE MODE</div><div id="safeModeVal">—</div>
+          <div>Aktif-Low</div><div id="activeLow">—</div>
+        </div>
+        <div class="hr"></div>
+        <button class="btn" id="i2cScanBtn">I2C Scan</button>
+        <div class="small" id="i2cScanOut">—</div>
+      </div>
+
+      <div class="card">
+        <h3>Sensörler</h3>
+        <div class="sensor">
+          <div class="sensor-name">BH1750</div>
+          <div class="sensor-val" id="luxVal">—</div>
+          <div class="sensor-err" id="luxErr"></div>
+        </div>
+        <div class="sensor">
+          <div class="sensor-name">ADS1115</div>
+          <div class="sensor-val" id="adsVal">—</div>
+          <div class="sensor-err" id="adsErr"></div>
+        </div>
+        <div class="sensor">
+          <div class="sensor-name">DS18B20</div>
+          <div class="sensor-val" id="dsVal">—</div>
+          <div class="sensor-err" id="dsErr"></div>
+        </div>
+        <div class="sensor">
+          <div class="sensor-name">DHT22 (GPIO17)</div>
+          <div class="sensor-val" id="dhtVal">—</div>
+          <div class="sensor-err" id="dhtErr"></div>
+          <div class="small">DHT Debian’da bazen <b>sudo</b> ve libgpiod ister.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Pompa Güvenliği</h3>
+        <div class="small">
+          Pompa (GPIO24) varsayılan kilitli. Su yokken çalıştırma. Test için unlock gerekir.
+        </div>
+        <div class="hr"></div>
+        <label class="checkbox">
+          <input id="pumpUnlock" type="checkbox">
+          <span>Pompayı geçici unlock et</span>
+        </label>
+        <div class="small warn">
+          Unlock açsan bile pompa max süre: <span id="pumpMax">—</span> sn
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Röle Kontrol</h3>
+      <div id="relayList" class="relay-list"></div>
+    </section>
+
+    <section class="card">
+      <h3>Pin Mapping / Ayarlar</h3>
+      <div class="small">Pinleri değiştirip kaydedebilirsin. Kaydetmede çakışma kontrolü yapılır.</div>
+
+      <div class="form-grid" id="configForm"></div>
+
+      <div class="row">
+        <label class="checkbox">
+          <input id="cfgActiveLow" type="checkbox">
+          <span>Röle kartı aktif-low</span>
+        </label>
+
+        <div class="inline">
+          <label>DHT22 GPIO</label>
+          <input id="cfgDhtGpio" type="number" min="0" max="27">
+        </div>
+
+        <div class="inline">
+          <label>Heater max (sn)</label>
+          <input id="cfgHeaterMax" type="number" min="1" max="30">
+        </div>
+
+        <div class="inline">
+          <label>Pump max (sn)</label>
+          <input id="cfgPumpMax" type="number" min="1" max="15">
+        </div>
+      </div>
+
+      <div class="row">
+        <button class="btn primary" id="saveCfgBtn">Kaydet & Yeniden Yükle</button>
+        <span id="saveCfgOut" class="small"></span>
+      </div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('test_panel.static', filename='app.js') }}"></script>
+</body>
+</html>

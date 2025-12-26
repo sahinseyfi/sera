@@ -1,0 +1,449 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <p class="text-secondary mb-1">Sistem Ayarları</p>
+    <h2 class="mb-0">SAFE MODE, Limitler, Otomasyon</h2>
+  </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <h6 class="mb-1">Bu sayfa ne işe yarar?</h6>
+  <div class="small text-secondary">
+    Güvenlik modunu (SAFE MODE), pompa/ısıtıcı limitlerini ve otomasyon kurallarını buradan yönetirsin.
+    Admin Token gerekiyorsa ilk kutudan gir. Detay: <a href="/help#hAyarlar">Yardım/SSS</a>.
+  </div>
+</div></div>
+
+<div class="card mb-3"><div class="card-body">
+  <h6>Admin PIN / Token</h6>
+  <p class="text-secondary small">ADMIN_TOKEN tanımlıysa buraya gir. Tarayıcıda saklanır. Token yoksa admin işlemleri sadece yerel ağdan çalışır.</p>
+  <div class="row g-2 align-items-end">
+    <div class="col-md-6">
+      <label class="form-label">Admin Token</label>
+      <input class="form-control" id="adminTokenInput" type="password" placeholder="PIN / Token">
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-primary w-100" id="saveAdminToken" type="button">Kaydet</button>
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-outline-secondary w-100" id="clearAdminToken" type="button">Temizle</button>
+    </div>
+  </div>
+  <small class="text-secondary" id="adminTokenStatus">Durum: --</small>
+</div></div>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card h-100"><div class="card-body">
+      <h6>SAFE MODE</h6>
+      <p class="text-secondary small">SAFE MODE açıkken kontrol endpointleri kilitli, sadece izleme.</p>
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="safeModeToggle">
+        <label class="form-check-label" for="safeModeToggle">SAFE MODE aktif</label>
+      </div>
+    </div></div>
+  </div>
+  <div class="col-md-6">
+    <div class="card h-100"><div class="card-body">
+      <h6>Limitler</h6>
+      <div class="row g-2">
+        <div class="col-12">
+          <label class="form-label">Pompa Max Saniye</label>
+          <input class="form-control" id="pumpMax" type="number" min="1" value="15">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Pompa Cooldown (s)</label>
+          <input class="form-control" id="pumpCooldown" type="number" min="1" value="60">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Isıtıcı Max (s)</label>
+          <input class="form-control" id="heaterMax" type="number" min="30" value="300">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Isıtıcı Üst Limit (C)</label>
+          <input class="form-control" id="heaterCutoff" type="number" min="0" step="0.1" value="30">
+          <div class="form-text">0 devre dışı</div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<div class="card mt-3"><div class="card-body">
+  <h6>Uyarı Eşikleri</h6>
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label class="form-label">Sensör Offline (dk)</label>
+      <input class="form-control" id="alertOfflineMinutes" type="number" min="0" value="5">
+      <div class="form-text">0 devre dışı</div>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Sıcaklık Yüksek (C)</label>
+      <input class="form-control" id="alertTempHigh" type="number" step="0.1" value="30">
+      <div class="form-text">0 devre dışı</div>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Sıcaklık Düşük (C)</label>
+      <input class="form-control" id="alertTempLow" type="number" step="0.1" value="0">
+      <div class="form-text">0 devre dışı</div>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Nem Yüksek (%)</label>
+      <input class="form-control" id="alertHumHigh" type="number" step="0.1" value="85">
+      <div class="form-text">0 devre dışı</div>
+    </div>
+  </div>
+  <div class="row g-2 mt-2">
+    <div class="col-md-3">
+      <label class="form-label">Nem Düşük (%)</label>
+      <input class="form-control" id="alertHumLow" type="number" step="0.1" value="0">
+      <div class="form-text">0 devre dışı</div>
+    </div>
+  </div>
+</div></div>
+
+<div class="card mt-3"><div class="card-body">
+  <h6>Lux Otomasyonu</h6>
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label class="form-label">Durum</label>
+      <select class="form-select" id="autoEnabled">
+        <option value="false">Kapalı</option>
+        <option value="true">Açık</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">LUX_OK</label>
+      <input class="form-control" id="luxOk" type="number" value="350">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">LUX_MAX (opsiyonel)</label>
+      <input class="form-control" id="luxMax" type="number" value="0">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Hedef (dk)</label>
+      <input class="form-control" id="targetMinutes" type="number" value="300">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Zaman Penceresi</label>
+      <div class="d-flex gap-2">
+        <input class="form-control" id="windowStart" type="time" value="06:00">
+        <input class="form-control" id="windowEnd" type="time" value="22:00">
+      </div>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Reset Saati</label>
+      <input class="form-control" id="resetTime" type="time" value="00:00">
+    </div>
+  </div>
+  <div class="row g-2 mt-2">
+    <div class="col-md-3">
+      <label class="form-label">Min Açık (dk)</label>
+      <input class="form-control" id="minOnMinutes" type="number" min="0" value="0">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Min Kapalı (dk)</label>
+      <input class="form-control" id="minOffMinutes" type="number" min="0" value="0">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Maks Blok (dk)</label>
+      <input class="form-control" id="maxBlockMinutes" type="number" min="0" value="0">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Manuel Override (dk)</label>
+      <input class="form-control" id="manualOverrideMinutes" type="number" min="0" value="0">
+    </div>
+  </div>
+  <button class="btn btn-primary mt-3" id="saveSettings">Kaydet</button>
+</div></div>
+
+<div class="card mt-3"><div class="card-body">
+  <h6>Isıtıcı Otomasyonu</h6>
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label class="form-label">Durum</label>
+      <select class="form-select" id="heaterEnabled">
+        <option value="false">Kapalı</option>
+        <option value="true">Açık</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Sensör</label>
+      <select class="form-select" id="heaterSensor">
+        <option value="dht22">DHT22</option>
+        <option value="ds18b20">DS18B20</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">T Low (C)</label>
+      <input class="form-control" id="heaterTLow" type="number" step="0.1" value="18">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">T High (C)</label>
+      <input class="form-control" id="heaterTHigh" type="number" step="0.1" value="20">
+    </div>
+  </div>
+  <div class="row g-2 mt-2">
+    <div class="col-md-3">
+      <label class="form-label">Max Çalışma (dk)</label>
+      <input class="form-control" id="heaterMaxMinutes" type="number" min="0" value="5">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Min Kapalı (dk)</label>
+      <input class="form-control" id="heaterMinOffMinutes" type="number" min="0" value="2">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Manuel Override (dk)</label>
+      <input class="form-control" id="heaterManualOverrideMinutes" type="number" min="0" value="10">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Fan Zorunlu</label>
+      <select class="form-select" id="heaterFanRequired">
+        <option value="true">Açık</option>
+        <option value="false">Kapalı</option>
+      </select>
+    </div>
+  </div>
+  <div class="row g-2 mt-2">
+    <div class="col-md-3">
+      <label class="form-label">Gece Modu</label>
+      <select class="form-select" id="heaterNightEnabled">
+        <option value="false">Kapalı</option>
+        <option value="true">Açık</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Gece Penceresi</label>
+      <div class="d-flex gap-2">
+        <input class="form-control" id="heaterNightStart" type="time" value="22:00">
+        <input class="form-control" id="heaterNightEnd" type="time" value="06:00">
+      </div>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Gece T Low (C)</label>
+      <input class="form-control" id="heaterNightTLow" type="number" step="0.1" value="17">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Gece T High (C)</label>
+      <input class="form-control" id="heaterNightTHigh" type="number" step="0.1" value="19">
+    </div>
+  </div>
+</div></div>
+
+<div class="card mt-3"><div class="card-body">
+  <h6>Pompa Otomasyonu</h6>
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label class="form-label">Durum</label>
+      <select class="form-select" id="pumpEnabled">
+        <option value="false">Kapalı</option>
+        <option value="true">Açık</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Toprak Sensörü</label>
+      <select class="form-select" id="pumpSoilChannel">
+        <option value="ch0">CH0</option>
+        <option value="ch1">CH1</option>
+        <option value="ch2">CH2</option>
+        <option value="ch3">CH3</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Kuru Eşiği (raw)</label>
+      <input class="form-control" id="pumpDryThreshold" type="number" value="0">
+      <div class="form-text">0 devre dışı</div>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Kuru Yönü</label>
+      <select class="form-select" id="pumpDryWhenAbove">
+        <option value="false">Değer düşükse kuru</option>
+        <option value="true">Değer yüksekse kuru</option>
+      </select>
+    </div>
+  </div>
+  <div class="row g-2 mt-2">
+    <div class="col-md-3">
+      <label class="form-label">Darbe Süresi (sn)</label>
+      <input class="form-control" id="pumpPulseSeconds" type="number" min="1" value="5">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Max Günlük (sn)</label>
+      <input class="form-control" id="pumpMaxDailySeconds" type="number" min="0" value="60">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Zaman Penceresi</label>
+      <div class="d-flex gap-2">
+        <input class="form-control" id="pumpWindowStart" type="time" value="06:00">
+        <input class="form-control" id="pumpWindowEnd" type="time" value="22:00">
+      </div>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Manuel Override (dk)</label>
+      <input class="form-control" id="pumpManualOverrideMinutes" type="number" min="0" value="10">
+    </div>
+  </div>
+</div></div>
+
+<div class="card mt-3"><div class="card-body">
+  <h6>Toprak Nem Kalibrasyonu</h6>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Kanal</th>
+          <th>Kuru</th>
+          <th>Islak</th>
+          <th>Şimdi Al</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CH0</td>
+          <td><input class="form-control form-control-sm" id="calDryCh0" type="number"></td>
+          <td><input class="form-control form-control-sm" id="calWetCh0" type="number"></td>
+          <td>
+            <div class="d-flex gap-1">
+              <button class="btn btn-outline-secondary btn-sm" data-cal-channel="ch0" data-cal-type="dry">Kuru</button>
+              <button class="btn btn-outline-secondary btn-sm" data-cal-channel="ch0" data-cal-type="wet">Islak</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>CH1</td>
+          <td><input class="form-control form-control-sm" id="calDryCh1" type="number"></td>
+          <td><input class="form-control form-control-sm" id="calWetCh1" type="number"></td>
+          <td>
+            <div class="d-flex gap-1">
+              <button class="btn btn-outline-secondary btn-sm" data-cal-channel="ch1" data-cal-type="dry">Kuru</button>
+              <button class="btn btn-outline-secondary btn-sm" data-cal-channel="ch1" data-cal-type="wet">Islak</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>CH2</td>
+          <td><input class="form-control form-control-sm" id="calDryCh2" type="number"></td>
+          <td><input class="form-control form-control-sm" id="calWetCh2" type="number"></td>
+          <td>
+            <div class="d-flex gap-1">
+              <button class="btn btn-outline-secondary btn-sm" data-cal-channel="ch2" data-cal-type="dry">Kuru</button>
+              <button class="btn btn-outline-secondary btn-sm" data-cal-channel="ch2" data-cal-type="wet">Islak</button>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td>CH3</td>
+          <td><input class="form-control form-control-sm" id="calDryCh3" type="number"></td>
+          <td><input class="form-control form-control-sm" id="calWetCh3" type="number"></td>
+          <td>
+            <div class="d-flex gap-1">
+              <button class="btn btn-outline-secondary btn-sm" data-cal-channel="ch3" data-cal-type="dry">Kuru</button>
+              <button class="btn btn-outline-secondary btn-sm" data-cal-channel="ch3" data-cal-type="wet">Islak</button>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="form-text">Kuru: sensör havada. Islak: suya/çok ıslak toprağa batır.</div>
+</div></div>
+
+<div class="card mt-3"><div class="card-body">
+  <h6>Nem Fan Otomasyonu</h6>
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label class="form-label">Durum</label>
+      <select class="form-select" id="fanEnabled">
+        <option value="false">Kapalı</option>
+        <option value="true">Açık</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">RH High (%)</label>
+      <input class="form-control" id="fanRhHigh" type="number" value="80">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">RH Low (%)</label>
+      <input class="form-control" id="fanRhLow" type="number" value="70">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Max Çalışma (dk)</label>
+      <input class="form-control" id="fanMaxMinutes" type="number" min="0" value="3">
+    </div>
+  </div>
+  <div class="row g-2 mt-2">
+    <div class="col-md-3">
+      <label class="form-label">Min Kapalı (dk)</label>
+      <input class="form-control" id="fanMinOffMinutes" type="number" min="0" value="2">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Manuel Override (dk)</label>
+      <input class="form-control" id="fanManualOverrideMinutes" type="number" min="0" value="10">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Gece Modu</label>
+      <select class="form-select" id="fanNightEnabled">
+        <option value="false">Kapalı</option>
+        <option value="true">Açık</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Gece Penceresi</label>
+      <div class="d-flex gap-2">
+        <input class="form-control" id="fanNightStart" type="time" value="22:00">
+        <input class="form-control" id="fanNightEnd" type="time" value="06:00">
+      </div>
+    </div>
+  </div>
+  <div class="row g-2 mt-2">
+    <div class="col-md-3">
+      <label class="form-label">Gece RH High (%)</label>
+      <input class="form-control" id="fanNightRhHigh" type="number" value="85">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Gece RH Low (%)</label>
+      <input class="form-control" id="fanNightRhLow" type="number" value="75">
+    </div>
+  </div>
+  <div class="row g-2 mt-2">
+    <div class="col-md-3">
+      <label class="form-label">Periyodik Mod</label>
+      <select class="form-select" id="fanPeriodicEnabled">
+        <option value="false">Kapalı</option>
+        <option value="true">Açık</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Her (dk)</label>
+      <input class="form-control" id="fanPeriodicEvery" type="number" min="1" value="60">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Süre (dk)</label>
+      <input class="form-control" id="fanPeriodicDuration" type="number" min="1" value="2">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Gece Periyodik</label>
+      <select class="form-select" id="fanPeriodicNightEnabled">
+        <option value="false">Kapalı</option>
+        <option value="true">Açık</option>
+      </select>
+    </div>
+  </div>
+  <div class="row g-2 mt-2">
+    <div class="col-md-3">
+      <label class="form-label">Gece Her (dk)</label>
+      <input class="form-control" id="fanPeriodicNightEvery" type="number" min="1" value="90">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Gece Süre (dk)</label>
+      <input class="form-control" id="fanPeriodicNightDuration" type="number" min="1" value="2">
+    </div>
+    <div class="col-md-6 d-flex align-items-end">
+      <p class="text-secondary small mb-0">Gece penceresi fan ayarlarındaki "Gece Penceresi" ile aynıdır.</p>
+    </div>
+  </div>
+</div></div>
+
+<script>window.initSettings && window.initSettings();</script>
+{% endblock %}
