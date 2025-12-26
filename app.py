@@ -259,12 +259,15 @@ class SensorManager:
         self.last_readings: Dict[str, Any] = {}
         self.last_ts: float = 0
         self.dht22_history: Deque[Tuple[float, float, float]] = deque()
+        self.dht22_sensor = None
+        self.ads_channels: List[Any] = []
         # optional hardware libs
         self._init_hardware()
 
     def _init_hardware(self) -> None:
         self.dht = None
         self.ads = None
+        self.ads_adafruit = None
         self.bus = None
         if self.simulation:
             return
@@ -274,6 +277,16 @@ class SensorManager:
             self.dht = Adafruit_DHT
         except Exception:
             self.dht = None
+        try:
+            import adafruit_dht  # type: ignore
+            import board  # type: ignore
+
+            gpio_pin = int(os.getenv("DHT22_GPIO", "17"))
+            pin_name = f"D{gpio_pin}"
+            pin = getattr(board, pin_name, board.D17)
+            self.dht22_sensor = adafruit_dht.DHT22(pin)
+        except Exception:
+            self.dht22_sensor = None
         try:
             from smbus2 import SMBus  # type: ignore
 
@@ -286,6 +299,24 @@ class SensorManager:
             self.ads = Adafruit_ADS1x15.ADS1115()
         except Exception:
             self.ads = None
+        try:
+            import board  # type: ignore
+            import busio  # type: ignore
+            from adafruit_ads1x15.ads1115 import ADS1115  # type: ignore
+            from adafruit_ads1x15.analog_in import AnalogIn  # type: ignore
+
+            i2c = busio.I2C(board.SCL, board.SDA)
+            self.ads_adafruit = ADS1115(i2c, address=0x48)
+            self.ads_adafruit.gain = 1
+            self.ads_channels = [
+                AnalogIn(self.ads_adafruit, 0),
+                AnalogIn(self.ads_adafruit, 1),
+                AnalogIn(self.ads_adafruit, 2),
+                AnalogIn(self.ads_adafruit, 3),
+            ]
+        except Exception:
+            self.ads_adafruit = None
+            self.ads_channels = []
 
     def read_all(self) -> Dict[str, Any]:
         now = time.time()
@@ -338,12 +369,33 @@ class SensorManager:
             return {"1m": avg(60), "5m": avg(300), "30m": avg(1800)}
 
     def _read_dht22(self) -> Dict[str, Any]:
-        if self.simulation or not self.dht:
+        if self.simulation:
             return {
                 "temperature": round(random.uniform(18, 30), 1),
                 "humidity": round(random.uniform(40, 70), 1),
                 "ts": time.time(),
                 "status": "simulated" if self.simulation else "unavailable",
+            }
+        if self.dht22_sensor:
+            try:
+                temperature = self.dht22_sensor.temperature
+                humidity = self.dht22_sensor.humidity
+                return {
+                    "temperature": temperature,
+                    "humidity": humidity,
+                    "ts": time.time(),
+                    "status": "ok" if humidity is not None else "error",
+                }
+            except RuntimeError:
+                return {"temperature": None, "humidity": None, "ts": time.time(), "status": "error"}
+            except Exception:
+                return {"temperature": None, "humidity": None, "ts": time.time(), "status": "error"}
+        if not self.dht:
+            return {
+                "temperature": None,
+                "humidity": None,
+                "ts": time.time(),
+                "status": "unavailable",
             }
         gpio_pin = int(os.getenv("DHT22_GPIO", "17"))
         humidity, temperature = self.dht.read_retry(self.dht.DHT22, gpio_pin)
@@ -409,7 +461,7 @@ class SensorManager:
         return {"lux": None, "ts": time.time(), "status": "error"}
 
     def _read_soil(self) -> Dict[str, Any]:
-        if self.simulation or not self.ads:
+        if self.simulation:
             return {
                 "ch0": round(random.uniform(12000, 20000), 0),
                 "ch1": round(random.uniform(12000, 20000), 0),
@@ -417,6 +469,38 @@ class SensorManager:
                 "ch3": round(random.uniform(12000, 20000), 0),
                 "ts": time.time(),
                 "status": "simulated" if self.simulation else "unavailable",
+            }
+        if self.ads_adafruit and self.ads_channels:
+            try:
+                ch0 = self.ads_channels[0].value
+                ch1 = self.ads_channels[1].value
+                ch2 = self.ads_channels[2].value
+                ch3 = self.ads_channels[3].value
+                return {
+                    "ch0": ch0,
+                    "ch1": ch1,
+                    "ch2": ch2,
+                    "ch3": ch3,
+                    "ts": time.time(),
+                    "status": "ok",
+                }
+            except Exception:
+                return {
+                    "ch0": None,
+                    "ch1": None,
+                    "ch2": None,
+                    "ch3": None,
+                    "ts": time.time(),
+                    "status": "error",
+                }
+        if not self.ads:
+            return {
+                "ch0": None,
+                "ch1": None,
+                "ch2": None,
+                "ch3": None,
+                "ts": time.time(),
+                "status": "unavailable",
             }
         try:
             gain = 1
