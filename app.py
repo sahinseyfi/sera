@@ -284,7 +284,7 @@ class SensorManager:
             gpio_pin = int(os.getenv("DHT22_GPIO", "17"))
             pin_name = f"D{gpio_pin}"
             pin = getattr(board, pin_name, board.D17)
-            self.dht22_sensor = adafruit_dht.DHT22(pin)
+            self.dht22_sensor = adafruit_dht.DHT22(pin, use_pulseio=False)
         except Exception:
             self.dht22_sensor = None
         try:
@@ -377,19 +377,21 @@ class SensorManager:
                 "status": "simulated" if self.simulation else "unavailable",
             }
         if self.dht22_sensor:
-            try:
-                temperature = self.dht22_sensor.temperature
-                humidity = self.dht22_sensor.humidity
-                return {
-                    "temperature": temperature,
-                    "humidity": humidity,
-                    "ts": time.time(),
-                    "status": "ok" if humidity is not None else "error",
-                }
-            except RuntimeError:
-                return {"temperature": None, "humidity": None, "ts": time.time(), "status": "error"}
-            except Exception:
-                return {"temperature": None, "humidity": None, "ts": time.time(), "status": "error"}
+            for attempt in range(2):
+                try:
+                    temperature = self.dht22_sensor.temperature
+                    humidity = self.dht22_sensor.humidity
+                    return {
+                        "temperature": temperature,
+                        "humidity": humidity,
+                        "ts": time.time(),
+                        "status": "ok" if humidity is not None else "error",
+                    }
+                except RuntimeError:
+                    time.sleep(0.2)
+                except Exception:
+                    break
+            return {"temperature": None, "humidity": None, "ts": time.time(), "status": "error"}
         if not self.dht:
             return {
                 "temperature": None,
@@ -470,6 +472,22 @@ class SensorManager:
                 "ts": time.time(),
                 "status": "simulated" if self.simulation else "unavailable",
             }
+        if self.bus:
+            try:
+                ch0 = self._read_ads1115_raw(self.bus, 0)
+                ch1 = self._read_ads1115_raw(self.bus, 1)
+                ch2 = self._read_ads1115_raw(self.bus, 2)
+                ch3 = self._read_ads1115_raw(self.bus, 3)
+                return {
+                    "ch0": ch0,
+                    "ch1": ch1,
+                    "ch2": ch2,
+                    "ch3": ch3,
+                    "ts": time.time(),
+                    "status": "ok",
+                }
+            except Exception:
+                pass
         if self.ads_adafruit and self.ads_channels:
             try:
                 ch0 = self.ads_channels[0].value
@@ -485,14 +503,7 @@ class SensorManager:
                     "status": "ok",
                 }
             except Exception:
-                return {
-                    "ch0": None,
-                    "ch1": None,
-                    "ch2": None,
-                    "ch3": None,
-                    "ts": time.time(),
-                    "status": "error",
-                }
+                pass
         if not self.ads:
             return {
                 "ch0": None,
@@ -525,6 +536,27 @@ class SensorManager:
                 "ts": time.time(),
                 "status": "error",
             }
+
+    @staticmethod
+    def _read_ads1115_raw(bus: Any, channel: int) -> Optional[int]:
+        if channel not in (0, 1, 2, 3):
+            raise ValueError("ADS1115 channel must be 0-3")
+        mux = 0x4 + channel
+        config = (
+            0x8000  # start single conversion
+            | (mux << 12)
+            | (0x1 << 9)  # gain = 1 (4.096V)
+            | 0x0100  # single-shot
+            | (0x4 << 5)  # 128 SPS
+            | 0x0003  # disable comparator
+        )
+        bus.write_i2c_block_data(0x48, 0x01, [(config >> 8) & 0xFF, config & 0xFF])
+        time.sleep(0.008)
+        data = bus.read_i2c_block_data(0x48, 0x00, 2)
+        raw = (data[0] << 8) | data[1]
+        if raw & 0x8000:
+            raw -= 1 << 16
+        return raw
 
     def latest(self) -> Dict[str, Any]:
         with self.lock:
