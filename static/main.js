@@ -166,11 +166,11 @@ function renderStatus(status) {
     ageEl.classList.remove('text-danger', 'text-secondary');
     ageEl.classList.add(status.data_stale ? 'text-danger' : 'text-secondary');
   }
-  if (window.renderDashboard) window.renderDashboard(status);
-  if (window.renderControl) window.renderControl(status);
-  if (window.renderSettings) window.renderSettings(status);
-  if (window.renderPins) window.renderPins(status);
-  if (window.renderLcd) window.renderLcd(status);
+  try { if (window.renderDashboard) window.renderDashboard(status); } catch (_) {}
+  try { if (window.renderControl) window.renderControl(status); } catch (_) {}
+  try { if (window.renderSettings) window.renderSettings(status); } catch (_) {}
+  try { if (window.renderPins) window.renderPins(status); } catch (_) {}
+  try { if (window.renderLcd) window.renderLcd(status); } catch (_) {}
 }
 
 function poll() {
@@ -191,6 +191,7 @@ window.initDashboard = function() {
 };
 
 window.renderDashboard = function(data) {
+  if (!document.getElementById('dhtTemp')) return;
   const readings = data.sensor_readings || {};
   const dht = readings.dht22 || {};
   const ds = readings.ds18b20 || {};

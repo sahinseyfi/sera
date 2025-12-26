@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Kontrol sayfasi kartlari duzeltildi",
+    "summary": "Kontrol ekraninda tum roleler gorunur hale geldi.",
+    "details": [
+      "Sayfa disi grafik kodlari kontrol sayfasini bozmuyor.",
+      "Kontrol kartlari artik duzenli yukleniyor."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Disabled sensor uyari kaydi durduruldu",
     "summary": "Disabled olan sensörler olay gunlugunde hata olarak yazilmaz.",
     "details": [
