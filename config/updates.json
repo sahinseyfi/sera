@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Disabled sensor uyari kaydi durduruldu",
+    "summary": "Disabled olan sensörler olay gunlugunde hata olarak yazilmaz.",
+    "details": [
+      "DS18B20 kapaliyken okuma hatasi mesaji gorunmez.",
+      "Olay gunlugu gereksiz uyarilarla dolmaz."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Grafiklerde hover bilgi ve sık etiketler",
     "summary": "Grafikte gezince saat ve değer görünür, eksen etiketleri sıklaştırıldı.",
     "details": [

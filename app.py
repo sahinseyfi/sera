@@ -2073,6 +2073,8 @@ def _record_sensor_alert(key: str, label: str, status: Optional[str], action: Op
     state = _sensor_alert_state.get(key, {})
     last_status = state.get("status")
     last_ts = state.get("ts", 0)
+    if status == "disabled":
+        return
     if status == last_status and now - last_ts < SENSOR_ALERT_COOLDOWN_SECONDS:
         return
     suffix = f" ({action})" if action else ""
