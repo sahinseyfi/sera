@@ -807,6 +807,10 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
     return;
   }
 
+  if (metric === 'dht_temp' || metric === 'ds18_temp') {
+    minVal = 0;
+    maxVal = 45;
+  }
   const range = (maxVal - minVal) || 1;
   const midVal = minVal + (range / 2);
   const labelColor = '#64748b';
@@ -837,7 +841,10 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
   }
 
   if (points.length < 2) {
-    const value = Number(points[0][1]);
+    let value = Number(points[0][1]);
+    if (metric === 'dht_temp' || metric === 'ds18_temp') {
+      value = Math.min(maxVal, Math.max(minVal, value));
+    }
     const x = pad + plotW;
     const y = pad + plotH - ((value - minVal) / range) * plotH;
     ctx.fillStyle = '#0ea5a4';
@@ -860,7 +867,10 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
 
   ctx.beginPath();
   points.forEach((point, idx) => {
-    const value = Number(point[1]);
+    let value = Number(point[1]);
+    if (metric === 'dht_temp' || metric === 'ds18_temp') {
+      value = Math.min(maxVal, Math.max(minVal, value));
+    }
     const x = pad + (plotW * (idx / (points.length - 1)));
     const y = pad + plotH - ((value - minVal) / range) * plotH;
     if (idx === 0) ctx.moveTo(x, y);
@@ -877,7 +887,10 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
 
   ctx.beginPath();
   points.forEach((point, idx) => {
-    const value = Number(point[1]);
+    let value = Number(point[1]);
+    if (metric === 'dht_temp' || metric === 'ds18_temp') {
+      value = Math.min(maxVal, Math.max(minVal, value));
+    }
     const x = pad + (plotW * (idx / (points.length - 1)));
     const y = pad + plotH - ((value - minVal) / range) * plotH;
     if (idx === 0) ctx.moveTo(x, y);
@@ -889,7 +902,10 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
 
   const lastPoint = points[points.length - 1];
   if (lastPoint) {
-    const value = Number(lastPoint[1]);
+    let value = Number(lastPoint[1]);
+    if (metric === 'dht_temp' || metric === 'ds18_temp') {
+      value = Math.min(maxVal, Math.max(minVal, value));
+    }
     const x = pad + plotW;
     const y = pad + plotH - ((value - minVal) / range) * plotH;
     ctx.fillStyle = '#0ea5a4';

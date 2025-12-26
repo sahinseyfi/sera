@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Sicaklik grafigi sabitlendi",
+    "summary": "Asiri DHT degerleri gorse bile sicaklik grafigi bozulmaz.",
+    "details": [
+      "Sicaklik grafigi 0-45 C araliginda sabitlenir.",
+      "Ust/alt disi degerler grafikte bu araliga sigdirilir."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Ayar kaydi daha dayanıklı hale geldi",
     "summary": "Bos alanlar kaydi bozmaz, SAFE MODE sorunsuz kaydolur.",
     "details": [
