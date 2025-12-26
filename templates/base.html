@@ -64,6 +64,21 @@
     }
     .text-secondary, small, .small { color: var(--muted) !important; }
     footer { color: var(--muted); }
+    .info-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      margin-left: 6px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: help;
+      color: var(--accent-strong);
+      border: 1px solid rgba(14, 165, 164, 0.35);
+      background: rgba(14, 165, 164, 0.08);
+    }
   </style>
 </head>
 <body>
@@ -97,5 +112,12 @@
     {% block content %}{% endblock %}
   </main>
   <footer class="container pb-4 small">Momo & Nova Station · Raspberry Pi 4</footer>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      if (!window.bootstrap) return;
+      const triggers = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+      triggers.forEach(el => new bootstrap.Tooltip(el));
+    });
+  </script>
 </body>
 </html>

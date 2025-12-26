@@ -40,7 +40,10 @@
       <p class="text-secondary small">SAFE MODE açıkken kontrol endpointleri kilitli, sadece izleme.</p>
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="safeModeToggle">
-        <label class="form-check-label" for="safeModeToggle">SAFE MODE aktif</label>
+        <label class="form-check-label" for="safeModeToggle">
+          SAFE MODE aktif
+          <span class="info-icon" data-bs-toggle="tooltip" title="Açıkken röle kontrolü ve otomasyon komutları kilitlenir. Sadece izleme yapılır.">?</span>
+        </label>
       </div>
     </div></div>
   </div>
@@ -49,19 +52,27 @@
       <h6>Limitler</h6>
       <div class="row g-2">
         <div class="col-12">
-          <label class="form-label">Pompa Max Saniye</label>
+          <label class="form-label">Pompa Max Saniye
+            <span class="info-icon" data-bs-toggle="tooltip" title="Tek seferde pompanın çalışabileceği maksimum süre. Güvenlik için kısa tut.">?</span>
+          </label>
           <input class="form-control" id="pumpMax" type="number" min="1" value="15">
         </div>
         <div class="col-12">
-          <label class="form-label">Pompa Cooldown (s)</label>
+          <label class="form-label">Pompa Cooldown (s)
+            <span class="info-icon" data-bs-toggle="tooltip" title="Pompa kapandıktan sonra yeniden çalıştırılmadan önce beklenmesi gereken süre.">?</span>
+          </label>
           <input class="form-control" id="pumpCooldown" type="number" min="1" value="60">
         </div>
         <div class="col-12">
-          <label class="form-label">Isıtıcı Max (s)</label>
+          <label class="form-label">Isıtıcı Max (s)
+            <span class="info-icon" data-bs-toggle="tooltip" title="Isıtıcının tek seferde çalışabileceği en uzun süre.">?</span>
+          </label>
           <input class="form-control" id="heaterMax" type="number" min="30" value="300">
         </div>
         <div class="col-12">
-          <label class="form-label">Isıtıcı Üst Limit (C)</label>
+          <label class="form-label">Isıtıcı Üst Limit (C)
+            <span class="info-icon" data-bs-toggle="tooltip" title="Bu sıcaklıkta ısıtıcı zorla kapatılır. 0 ise devre dışı.">?</span>
+          </label>
           <input class="form-control" id="heaterCutoff" type="number" min="0" step="0.1" value="30">
           <div class="form-text">0 devre dışı</div>
         </div>
@@ -74,29 +85,39 @@
   <h6>Uyarı Eşikleri</h6>
   <div class="row g-2">
     <div class="col-md-3">
-      <label class="form-label">Sensör Offline (dk)</label>
+      <label class="form-label">Sensör Offline (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Sensörden bu süre boyunca OK veri gelmezse uyarı üretir.">?</span>
+      </label>
       <input class="form-control" id="alertOfflineMinutes" type="number" min="0" value="5">
       <div class="form-text">0 devre dışı</div>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Sıcaklık Yüksek (C)</label>
+      <label class="form-label">Sıcaklık Yüksek (C)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Üst sınır aşıldığında uyarı üretir. 0 ise devre dışı.">?</span>
+      </label>
       <input class="form-control" id="alertTempHigh" type="number" step="0.1" value="30">
       <div class="form-text">0 devre dışı</div>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Sıcaklık Düşük (C)</label>
+      <label class="form-label">Sıcaklık Düşük (C)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Alt sınır altına düşerse uyarı üretir. 0 ise devre dışı.">?</span>
+      </label>
       <input class="form-control" id="alertTempLow" type="number" step="0.1" value="0">
       <div class="form-text">0 devre dışı</div>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Nem Yüksek (%)</label>
+      <label class="form-label">Nem Yüksek (%)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Nem bu değerin üstüne çıkarsa uyarı üretir. 0 ise devre dışı.">?</span>
+      </label>
       <input class="form-control" id="alertHumHigh" type="number" step="0.1" value="85">
       <div class="form-text">0 devre dışı</div>
     </div>
   </div>
   <div class="row g-2 mt-2">
     <div class="col-md-3">
-      <label class="form-label">Nem Düşük (%)</label>
+      <label class="form-label">Nem Düşük (%)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Nem bu değerin altına düşerse uyarı üretir. 0 ise devre dışı.">?</span>
+      </label>
       <input class="form-control" id="alertHumLow" type="number" step="0.1" value="0">
       <div class="form-text">0 devre dışı</div>
     </div>
@@ -107,15 +128,21 @@
   <h6>Enerji Bedeli (TL/kWh)</h6>
   <div class="row g-2">
     <div class="col-md-4">
-      <label class="form-label">Düşük Kademe</label>
+      <label class="form-label">Düşük Kademe
+        <span class="info-icon" data-bs-toggle="tooltip" title="Belirlenen eşik kWh’a kadar uygulanacak birim fiyat.">?</span>
+      </label>
       <input class="form-control" id="energyKwhLow" type="number" step="0.001" value="2.330">
     </div>
     <div class="col-md-4">
-      <label class="form-label">Yüksek Kademe</label>
+      <label class="form-label">Yüksek Kademe
+        <span class="info-icon" data-bs-toggle="tooltip" title="Eşik kWh üstündeki tüketime uygulanacak birim fiyat.">?</span>
+      </label>
       <input class="form-control" id="energyKwhHigh" type="number" step="0.001" value="3.451">
     </div>
     <div class="col-md-4">
-      <label class="form-label">Kademe Eşiği (kWh)</label>
+      <label class="form-label">Kademe Eşiği (kWh)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Bu toplam kWh aşıldığında yüksek kademe fiyatı uygulanır.">?</span>
+      </label>
       <input class="form-control" id="energyKwhThreshold" type="number" step="1" value="240">
     </div>
   </div>
@@ -126,51 +153,71 @@
   <h6>Lux Otomasyonu</h6>
   <div class="row g-2">
     <div class="col-md-3">
-      <label class="form-label">Durum</label>
+      <label class="form-label">Durum
+        <span class="info-icon" data-bs-toggle="tooltip" title="Lux otomasyonunu aç/kapat. Kapalıysa ışık otomasyonu çalışmaz.">?</span>
+      </label>
       <select class="form-select" id="autoEnabled">
         <option value="false">Kapalı</option>
         <option value="true">Açık</option>
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label">LUX_OK</label>
+      <label class="form-label">LUX_OK
+        <span class="info-icon" data-bs-toggle="tooltip" title="Lux bu değerin üstündeyse ışık yeterli sayılır.">?</span>
+      </label>
       <input class="form-control" id="luxOk" type="number" value="350">
     </div>
     <div class="col-md-3">
-      <label class="form-label">LUX_MAX (opsiyonel)</label>
+      <label class="form-label">LUX_MAX (opsiyonel)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Lux bu değeri geçerse otomasyon geçici olarak durur. 0 devre dışı.">?</span>
+      </label>
       <input class="form-control" id="luxMax" type="number" value="0">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Hedef (dk)</label>
+      <label class="form-label">Hedef (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gün içinde lux hedefinin sağlanması gereken toplam dakika.">?</span>
+      </label>
       <input class="form-control" id="targetMinutes" type="number" value="300">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Zaman Penceresi</label>
+      <label class="form-label">Zaman Penceresi
+        <span class="info-icon" data-bs-toggle="tooltip" title="Otomasyonun aktif olacağı saat aralığı. Geceyi kapsayabilir.">?</span>
+      </label>
       <div class="d-flex gap-2">
         <input class="form-control" id="windowStart" type="time" value="06:00">
         <input class="form-control" id="windowEnd" type="time" value="22:00">
       </div>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Reset Saati</label>
+      <label class="form-label">Reset Saati
+        <span class="info-icon" data-bs-toggle="tooltip" title="Günlük hedef sayacı bu saatte sıfırlanır.">?</span>
+      </label>
       <input class="form-control" id="resetTime" type="time" value="00:00">
     </div>
   </div>
   <div class="row g-2 mt-2">
     <div class="col-md-3">
-      <label class="form-label">Min Açık (dk)</label>
+      <label class="form-label">Min Açık (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Işık açıldıktan sonra en az bu kadar açık kalır.">?</span>
+      </label>
       <input class="form-control" id="minOnMinutes" type="number" min="0" value="0">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Min Kapalı (dk)</label>
+      <label class="form-label">Min Kapalı (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Işık kapandıktan sonra en az bu kadar kapalı kalır.">?</span>
+      </label>
       <input class="form-control" id="minOffMinutes" type="number" min="0" value="0">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Maks Blok (dk)</label>
+      <label class="form-label">Maks Blok (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Sürekli çalışmayı önlemek için blok süresi. 0 devre dışı.">?</span>
+      </label>
       <input class="form-control" id="maxBlockMinutes" type="number" min="0" value="0">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Manuel Override (dk)</label>
+      <label class="form-label">Manuel Override (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Manuel aç/kapat sonrası otomasyonun bekleyeceği süre.">?</span>
+      </label>
       <input class="form-control" id="manualOverrideMinutes" type="number" min="0" value="0">
     </div>
   </div>
@@ -181,43 +228,59 @@
   <h6>Isıtıcı Otomasyonu</h6>
   <div class="row g-2">
     <div class="col-md-3">
-      <label class="form-label">Durum</label>
+      <label class="form-label">Durum
+        <span class="info-icon" data-bs-toggle="tooltip" title="Isıtıcı otomasyonunu aç/kapat. Kapalıysa sadece manuel kontrol edilir.">?</span>
+      </label>
       <select class="form-select" id="heaterEnabled">
         <option value="false">Kapalı</option>
         <option value="true">Açık</option>
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Sensör</label>
+      <label class="form-label">Sensör
+        <span class="info-icon" data-bs-toggle="tooltip" title="Isıtıcı kontrolü için kullanılan sıcaklık sensörü.">?</span>
+      </label>
       <select class="form-select" id="heaterSensor">
         <option value="dht22">DHT22</option>
         <option value="ds18b20">DS18B20</option>
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label">T Low (C)</label>
+      <label class="form-label">T Low (C)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Bu sıcaklığın altına düşerse ısıtıcı devreye girer.">?</span>
+      </label>
       <input class="form-control" id="heaterTLow" type="number" step="0.1" value="18">
     </div>
     <div class="col-md-3">
-      <label class="form-label">T High (C)</label>
+      <label class="form-label">T High (C)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Bu sıcaklığa gelince ısıtıcı kapanır.">?</span>
+      </label>
       <input class="form-control" id="heaterTHigh" type="number" step="0.1" value="20">
     </div>
   </div>
   <div class="row g-2 mt-2">
     <div class="col-md-3">
-      <label class="form-label">Max Çalışma (dk)</label>
+      <label class="form-label">Max Çalışma (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Isıtıcı bir seferde bu süreyi aşamaz.">?</span>
+      </label>
       <input class="form-control" id="heaterMaxMinutes" type="number" min="0" value="5">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Min Kapalı (dk)</label>
+      <label class="form-label">Min Kapalı (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Isıtıcı kapandıktan sonra en az bu süre bekler.">?</span>
+      </label>
       <input class="form-control" id="heaterMinOffMinutes" type="number" min="0" value="2">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Manuel Override (dk)</label>
+      <label class="form-label">Manuel Override (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Manuel müdahaleden sonra otomasyonun bekleyeceği süre.">?</span>
+      </label>
       <input class="form-control" id="heaterManualOverrideMinutes" type="number" min="0" value="10">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Fan Zorunlu</label>
+      <label class="form-label">Fan Zorunlu
+        <span class="info-icon" data-bs-toggle="tooltip" title="Isıtıcı çalışırken fanın açık olmasını şart koşar.">?</span>
+      </label>
       <select class="form-select" id="heaterFanRequired">
         <option value="true">Açık</option>
         <option value="false">Kapalı</option>
@@ -226,25 +289,33 @@
   </div>
   <div class="row g-2 mt-2">
     <div class="col-md-3">
-      <label class="form-label">Gece Modu</label>
+      <label class="form-label">Gece Modu
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gece için ayrı sıcaklık aralığı uygular.">?</span>
+      </label>
       <select class="form-select" id="heaterNightEnabled">
         <option value="false">Kapalı</option>
         <option value="true">Açık</option>
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Gece Penceresi</label>
+      <label class="form-label">Gece Penceresi
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gece modunun geçerli olduğu saat aralığı.">?</span>
+      </label>
       <div class="d-flex gap-2">
         <input class="form-control" id="heaterNightStart" type="time" value="22:00">
         <input class="form-control" id="heaterNightEnd" type="time" value="06:00">
       </div>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Gece T Low (C)</label>
+      <label class="form-label">Gece T Low (C)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gece için alt sıcaklık eşiği.">?</span>
+      </label>
       <input class="form-control" id="heaterNightTLow" type="number" step="0.1" value="17">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Gece T High (C)</label>
+      <label class="form-label">Gece T High (C)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gece için üst sıcaklık eşiği.">?</span>
+      </label>
       <input class="form-control" id="heaterNightTHigh" type="number" step="0.1" value="19">
     </div>
   </div>
@@ -254,14 +325,18 @@
   <h6>Pompa Otomasyonu</h6>
   <div class="row g-2">
     <div class="col-md-3">
-      <label class="form-label">Durum</label>
+      <label class="form-label">Durum
+        <span class="info-icon" data-bs-toggle="tooltip" title="Pompa otomasyonunu aç/kapat. Kapalıysa sadece manuel çalışır.">?</span>
+      </label>
       <select class="form-select" id="pumpEnabled">
         <option value="false">Kapalı</option>
         <option value="true">Açık</option>
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Toprak Sensörü</label>
+      <label class="form-label">Toprak Sensörü
+        <span class="info-icon" data-bs-toggle="tooltip" title="Pompanın karar vereceği toprak kanalını seç.">?</span>
+      </label>
       <select class="form-select" id="pumpSoilChannel">
         <option value="ch0">CH0</option>
         <option value="ch1">CH1</option>
@@ -270,12 +345,16 @@
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Kuru Eşiği (raw)</label>
+      <label class="form-label">Kuru Eşiği (raw)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Toprak ham değeri bu eşiğe göre kuru kabul edilir. 0 ise devre dışı.">?</span>
+      </label>
       <input class="form-control" id="pumpDryThreshold" type="number" value="0">
       <div class="form-text">0 devre dışı</div>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Kuru Yönü</label>
+      <label class="form-label">Kuru Yönü
+        <span class="info-icon" data-bs-toggle="tooltip" title="Sensör değeri düşükse mi yüksekse mi kuru sayılacağını belirler.">?</span>
+      </label>
       <select class="form-select" id="pumpDryWhenAbove">
         <option value="false">Değer düşükse kuru</option>
         <option value="true">Değer yüksekse kuru</option>
@@ -284,22 +363,30 @@
   </div>
   <div class="row g-2 mt-2">
     <div class="col-md-3">
-      <label class="form-label">Darbe Süresi (sn)</label>
+      <label class="form-label">Darbe Süresi (sn)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Pompanın tek seferde çalışacağı süre.">?</span>
+      </label>
       <input class="form-control" id="pumpPulseSeconds" type="number" min="1" value="5">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Max Günlük (sn)</label>
+      <label class="form-label">Max Günlük (sn)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gün içinde pompanın toplam çalışma süresi limiti.">?</span>
+      </label>
       <input class="form-control" id="pumpMaxDailySeconds" type="number" min="0" value="60">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Zaman Penceresi</label>
+      <label class="form-label">Zaman Penceresi
+        <span class="info-icon" data-bs-toggle="tooltip" title="Pompa otomasyonunun aktif olacağı saat aralığı.">?</span>
+      </label>
       <div class="d-flex gap-2">
         <input class="form-control" id="pumpWindowStart" type="time" value="06:00">
         <input class="form-control" id="pumpWindowEnd" type="time" value="22:00">
       </div>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Manuel Override (dk)</label>
+      <label class="form-label">Manuel Override (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Manuel sulamadan sonra otomasyonun bekleyeceği süre.">?</span>
+      </label>
       <input class="form-control" id="pumpManualOverrideMinutes" type="number" min="0" value="10">
     </div>
   </div>
@@ -372,43 +459,59 @@
   <h6>Nem Fan Otomasyonu</h6>
   <div class="row g-2">
     <div class="col-md-3">
-      <label class="form-label">Durum</label>
+      <label class="form-label">Durum
+        <span class="info-icon" data-bs-toggle="tooltip" title="Fan otomasyonunu aç/kapat.">?</span>
+      </label>
       <select class="form-select" id="fanEnabled">
         <option value="false">Kapalı</option>
         <option value="true">Açık</option>
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label">RH High (%)</label>
+      <label class="form-label">RH High (%)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Nem bu değerin üstüne çıkınca fan açılır.">?</span>
+      </label>
       <input class="form-control" id="fanRhHigh" type="number" value="80">
     </div>
     <div class="col-md-3">
-      <label class="form-label">RH Low (%)</label>
+      <label class="form-label">RH Low (%)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Nem bu değerin altına düşünce fan kapanır.">?</span>
+      </label>
       <input class="form-control" id="fanRhLow" type="number" value="70">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Max Çalışma (dk)</label>
+      <label class="form-label">Max Çalışma (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Fan bir seferde bu süreyi aşamaz.">?</span>
+      </label>
       <input class="form-control" id="fanMaxMinutes" type="number" min="0" value="3">
     </div>
   </div>
   <div class="row g-2 mt-2">
     <div class="col-md-3">
-      <label class="form-label">Min Kapalı (dk)</label>
+      <label class="form-label">Min Kapalı (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Fan kapandıktan sonra en az bu süre bekler.">?</span>
+      </label>
       <input class="form-control" id="fanMinOffMinutes" type="number" min="0" value="2">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Manuel Override (dk)</label>
+      <label class="form-label">Manuel Override (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Manuel müdahaleden sonra otomasyonun bekleyeceği süre.">?</span>
+      </label>
       <input class="form-control" id="fanManualOverrideMinutes" type="number" min="0" value="10">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Gece Modu</label>
+      <label class="form-label">Gece Modu
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gece saatlerinde farklı nem eşikleri uygular.">?</span>
+      </label>
       <select class="form-select" id="fanNightEnabled">
         <option value="false">Kapalı</option>
         <option value="true">Açık</option>
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Gece Penceresi</label>
+      <label class="form-label">Gece Penceresi
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gece modunun geçerli olduğu saat aralığı.">?</span>
+      </label>
       <div class="d-flex gap-2">
         <input class="form-control" id="fanNightStart" type="time" value="22:00">
         <input class="form-control" id="fanNightEnd" type="time" value="06:00">
@@ -417,32 +520,44 @@
   </div>
   <div class="row g-2 mt-2">
     <div class="col-md-3">
-      <label class="form-label">Gece RH High (%)</label>
+      <label class="form-label">Gece RH High (%)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gece için yüksek nem eşiği.">?</span>
+      </label>
       <input class="form-control" id="fanNightRhHigh" type="number" value="85">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Gece RH Low (%)</label>
+      <label class="form-label">Gece RH Low (%)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gece için düşük nem eşiği.">?</span>
+      </label>
       <input class="form-control" id="fanNightRhLow" type="number" value="75">
     </div>
   </div>
   <div class="row g-2 mt-2">
     <div class="col-md-3">
-      <label class="form-label">Periyodik Mod</label>
+      <label class="form-label">Periyodik Mod
+        <span class="info-icon" data-bs-toggle="tooltip" title="Nemden bağımsız periyodik çalıştırma.">?</span>
+      </label>
       <select class="form-select" id="fanPeriodicEnabled">
         <option value="false">Kapalı</option>
         <option value="true">Açık</option>
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Her (dk)</label>
+      <label class="form-label">Her (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Periyodik çalışma aralığı.">?</span>
+      </label>
       <input class="form-control" id="fanPeriodicEvery" type="number" min="1" value="60">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Süre (dk)</label>
+      <label class="form-label">Süre (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Periyodik çalışmanın süresi.">?</span>
+      </label>
       <input class="form-control" id="fanPeriodicDuration" type="number" min="1" value="2">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Gece Periyodik</label>
+      <label class="form-label">Gece Periyodik
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gece için ayrı periyodik çalıştırma ayarı.">?</span>
+      </label>
       <select class="form-select" id="fanPeriodicNightEnabled">
         <option value="false">Kapalı</option>
         <option value="true">Açık</option>
@@ -451,11 +566,15 @@
   </div>
   <div class="row g-2 mt-2">
     <div class="col-md-3">
-      <label class="form-label">Gece Her (dk)</label>
+      <label class="form-label">Gece Her (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gece periyodik çalışma aralığı.">?</span>
+      </label>
       <input class="form-control" id="fanPeriodicNightEvery" type="number" min="1" value="90">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Gece Süre (dk)</label>
+      <label class="form-label">Gece Süre (dk)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Gece periyodik çalışmanın süresi.">?</span>
+      </label>
       <input class="form-control" id="fanPeriodicNightDuration" type="number" min="1" value="2">
     </div>
     <div class="col-md-6 d-flex align-items-end">
