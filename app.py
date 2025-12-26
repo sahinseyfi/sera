@@ -22,6 +22,7 @@ TEST_PANEL_DIR = BASE_DIR / "sera_panel"
 DATA_DIR.mkdir(exist_ok=True)
 CHANNEL_CONFIG_PATH = CONFIG_DIR / "channels.json"
 SENSORS_CONFIG_PATH = CONFIG_DIR / "sensors.json"
+UPDATES_PATH = CONFIG_DIR / "updates.json"
 DB_PATH = DATA_DIR / "sera.db"
 SENSOR_CSV_LOG_DIR = DATA_DIR / "sensor_logs"
 
@@ -1631,6 +1632,32 @@ def load_sensors_config() -> Dict[str, Any]:
     return defaults
 
 
+def load_updates() -> List[Dict[str, Any]]:
+    defaults = [
+        {
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "title": "Güncellemeler sayfası eklendi",
+            "summary": "Panelde yapılan değişiklikleri artık buradan takip edebilirsin.",
+            "details": [
+                "Yeni özellikler ve iyileştirmeler kullanıcı dilinde özetlenir.",
+                "Bu liste GitHub'a push edildikçe güncellenir.",
+            ],
+        }
+    ]
+    if UPDATES_PATH.exists():
+        try:
+            with UPDATES_PATH.open() as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return data
+        except Exception:
+            pass
+    CONFIG_DIR.mkdir(exist_ok=True)
+    with UPDATES_PATH.open("w") as f:
+        json.dump(defaults, f, indent=2)
+    return defaults
+
+
 channel_config = load_channel_config()
 sensors_config = load_sensors_config()
 actuator_manager = ActuatorManager(backend, channel_config)
@@ -2333,6 +2360,11 @@ def help_page() -> Any:
     return render_template("help.html")
 
 
+@app.route("/updates")
+def updates_page() -> Any:
+    return render_template("updates.html")
+
+
 def api_status_payload(readings: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     latest = sensor_manager.latest()
     if readings is None:
@@ -2383,6 +2415,11 @@ def api_status_payload(readings: Optional[Dict[str, Any]] = None) -> Dict[str, A
 def api_status() -> Any:
     response = api_status_payload()
     return jsonify(response)
+
+
+@app.route("/api/updates")
+def api_updates() -> Any:
+    return jsonify({"items": load_updates()})
 
 
 @app.route("/api/sensor_log")

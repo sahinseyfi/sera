@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="hero p-3 rounded-4 mb-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <div>
+      <p class="text-secondary mb-1">Güncellemeler</p>
+      <h2 class="mb-0">Neler değişti?</h2>
+    </div>
+    <div class="text-end">
+      <small class="text-secondary" id="updatesUpdated">--</small>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <h6 class="mb-1">Bu sayfa ne işe yarar?</h6>
+  <div class="small text-secondary">
+    GitHub'a push edilen değişiklikler burada kullanıcı dilinde anlatılır. Teknik detay yerine “ne değişti, sana ne faydası var” odaklıdır.
+  </div>
+</div></div>
+
+<div id="updatesEmpty" class="small text-secondary d-none">Henüz güncelleme yok.</div>
+<div id="updatesList" class="d-grid gap-3"></div>
+
+<script>
+  (function initUpdates() {
+    const listEl = document.getElementById('updatesList');
+    const emptyEl = document.getElementById('updatesEmpty');
+    const updatedEl = document.getElementById('updatesUpdated');
+    if (!listEl) return;
+
+    fetch('/api/updates')
+      .then(resp => resp.json())
+      .then(data => {
+        const items = Array.isArray(data.items) ? data.items : [];
+        if (!items.length) {
+          emptyEl.classList.remove('d-none');
+          return;
+        }
+        updatedEl.textContent = `Son güncelleme: ${items[0].date || '--'}`;
+        items.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          const details = Array.isArray(item.details) ? item.details : [];
+          card.innerHTML = `
+            <div class="card-body">
+              <div class="d-flex justify-content-between flex-wrap gap-2">
+                <h5 class="card-title mb-0">${item.title || 'Güncelleme'}</h5>
+                <span class="pill small">${item.date || ''}</span>
+              </div>
+              <p class="text-secondary mt-2 mb-2">${item.summary || ''}</p>
+              ${details.length ? `
+                <ul class="small text-secondary mb-0">
+                  ${details.map(line => `<li>${line}</li>`).join('')}
+                </ul>
+              ` : ''}
+            </div>
+          `;
+          listEl.appendChild(card);
+        });
+      })
+      .catch(() => {
+        emptyEl.classList.remove('d-none');
+      });
+  })();
+</script>
+{% endblock %}

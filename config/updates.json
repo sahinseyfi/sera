@@ -1,0 +1,11 @@
+[
+  {
+    "date": "2025-12-27",
+    "title": "Güncellemeler sayfası eklendi",
+    "summary": "Artık panelde yapılan değişiklikleri kullanıcı dilinde buradan takip edebilirsin.",
+    "details": [
+      "Her GitHub push sonrasında bu listeye kısa ve anlaşılır bir not eklenir.",
+      "Teknik detay yerine sana etkisini ve faydasını anlatır."
+    ]
+  }
+]

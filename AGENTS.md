@@ -23,6 +23,10 @@
 - Run tests manually with the target hardware connected; there is no automated test runner configured.
 - Add new tests following the existing naming pattern and keep logs in `sera_panel/` when appropriate.
 
+## Update Log Guidelines
+- When pushing to GitHub, also add a user-friendly entry to `config/updates.json`.
+- Each entry should explain what changed and why it matters for the user (not technical details).
+
 ## Commit & Pull Request Guidelines
 - No Git history is present in this workspace; use clear, imperative commit messages (e.g., "Add relay polarity check").
 - PRs should include a short description, how you validated (commands run), and any hardware assumptions.
