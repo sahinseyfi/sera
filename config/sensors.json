@@ -4,7 +4,7 @@
   "ads1115_addr": "0x48",
   "ds18b20_enabled": false,
   "lcd_enabled": true,
-  "lcd_addr": "0x27",
+  "lcd_addr": "0x3F",
   "lcd_port": 1,
   "lcd_cols": 20,
   "lcd_rows": 4,

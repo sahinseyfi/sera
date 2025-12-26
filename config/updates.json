@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "LCD adresi 0x3F olarak ayarlandi",
+    "summary": "20x4 I2C LCD modulin dogru adresle calismasi icin varsayilan adresi guncelledim.",
+    "details": [
+      "LCD ayarlari artik 0x3F adresine gore yukleniyor.",
+      "Panelde gorunen LCD ayarlari moduline uygun hale geldi."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Güncellemeler sayfası eklendi",
     "summary": "Artık panelde yapılan değişiklikleri kullanıcı dilinde buradan takip edebilirsin.",
     "details": [

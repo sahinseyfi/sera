@@ -615,7 +615,7 @@ class LCDManager:
             self.lcd = None
             return
         try:
-            addr_raw = str(self.config.get("lcd_addr", "0x27"))
+            addr_raw = str(self.config.get("lcd_addr", "0x3F"))
             try:
                 addr = int(addr_raw, 0)
             except Exception:
@@ -1608,7 +1608,7 @@ def load_sensors_config() -> Dict[str, Any]:
         "ads1115_addr": "0x48",
         "ds18b20_enabled": True,
         "lcd_enabled": True,
-        "lcd_addr": "0x27",
+        "lcd_addr": "0x3F",
         "lcd_port": 1,
         "lcd_cols": 20,
         "lcd_rows": 4,
@@ -2790,7 +2790,7 @@ def api_lcd() -> Any:
             "lcd": lcd_manager.status(),
             "config": {
                 "lcd_enabled": sensors_config.get("lcd_enabled", True),
-                "lcd_addr": sensors_config.get("lcd_addr", "0x27"),
+                "lcd_addr": sensors_config.get("lcd_addr", "0x3F"),
                 "lcd_port": sensors_config.get("lcd_port", 1),
                 "lcd_cols": sensors_config.get("lcd_cols", 20),
                 "lcd_rows": sensors_config.get("lcd_rows", 4),
