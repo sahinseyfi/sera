@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Ayar kaydi daha dayanıklı hale geldi",
+    "summary": "Bos alanlar kaydi bozmaz, SAFE MODE sorunsuz kaydolur.",
+    "details": [
+      "Eksik sayisal alanlar mevcut degerlerle doldurulur.",
+      "Röle listesi bos gelirse kontrol ekraninda uyarı gorunur."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "Kaydedildi mesaji otomatik gizleniyor",
     "summary": "Kaydedildi yazisi birkac saniye sonra kendiliginden kaybolur.",
     "details": [

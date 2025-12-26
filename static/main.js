@@ -577,7 +577,12 @@ window.renderControl = function(data) {
       .join('');
   }
   wrap.innerHTML = '';
-  Object.entries(data.actuator_state || {}).forEach(([name, info]) => {
+  const actuators = Object.entries(data.actuator_state || {});
+  if (!actuators.length) {
+    wrap.innerHTML = '<div class="text-secondary small">Röleler yüklenemedi. Lütfen /api/status kontrol et.</div>';
+    return;
+  }
+  actuators.forEach(([name, info]) => {
     const col = document.createElement('div');
     col.className = 'col-md-4';
     const isPump = name.includes('PUMP');
@@ -1016,6 +1021,21 @@ function saveSettings() {
     clearTimeout(state.settingsSavedTimer);
     state.settingsSavedTimer = null;
   }
+  const readFloat = (id, fallback) => {
+    const el = document.getElementById(id);
+    if (!el) return fallback;
+    const value = parseFloat(el.value);
+    return Number.isFinite(value) ? value : fallback;
+  };
+  const readInt = (id, fallback) => {
+    const el = document.getElementById(id);
+    if (!el) return fallback;
+    const value = parseInt(el.value, 10);
+    return Number.isFinite(value) ? value : fallback;
+  };
+  const currentLimits = state.status?.limits || {};
+  const currentAuto = state.status?.automation || {};
+  const currentAlerts = state.status?.alerts_config || {};
   const tokenInput = document.getElementById('adminTokenInput');
   if (tokenInput) {
     const value = tokenInput.value.trim();
@@ -1026,28 +1046,17 @@ function saveSettings() {
     }
     updateAdminTokenStatus();
   }
-  const heaterCutoffRaw = parseFloat(document.getElementById('heaterCutoff').value);
-  const heaterCutoff = Number.isFinite(heaterCutoffRaw) ? heaterCutoffRaw : 0;
-  const heaterTLowRaw = parseFloat(document.getElementById('heaterTLow').value);
-  const heaterTHighRaw = parseFloat(document.getElementById('heaterTHigh').value);
-  const heaterNightTLowRaw = parseFloat(document.getElementById('heaterNightTLow').value);
-  const heaterNightTHighRaw = parseFloat(document.getElementById('heaterNightTHigh').value);
-  const heaterTLow = Number.isFinite(heaterTLowRaw) ? heaterTLowRaw : 18;
-  const heaterTHigh = Number.isFinite(heaterTHighRaw) ? heaterTHighRaw : 20;
-  const heaterNightTLow = Number.isFinite(heaterNightTLowRaw) ? heaterNightTLowRaw : 17;
-  const heaterNightTHigh = Number.isFinite(heaterNightTHighRaw) ? heaterNightTHighRaw : 19;
-  const pumpDryThresholdRaw = parseFloat(document.getElementById('pumpDryThreshold').value);
-  const pumpDryThreshold = Number.isFinite(pumpDryThresholdRaw) ? pumpDryThresholdRaw : 0;
-  const alertOfflineRaw = parseFloat(document.getElementById('alertOfflineMinutes').value);
-  const alertTempHighRaw = parseFloat(document.getElementById('alertTempHigh').value);
-  const alertTempLowRaw = parseFloat(document.getElementById('alertTempLow').value);
-  const alertHumHighRaw = parseFloat(document.getElementById('alertHumHigh').value);
-  const alertHumLowRaw = parseFloat(document.getElementById('alertHumLow').value);
-  const alertOfflineMinutes = Number.isFinite(alertOfflineRaw) ? alertOfflineRaw : 5;
-  const alertTempHigh = Number.isFinite(alertTempHighRaw) ? alertTempHighRaw : 30;
-  const alertTempLow = Number.isFinite(alertTempLowRaw) ? alertTempLowRaw : 0;
-  const alertHumHigh = Number.isFinite(alertHumHighRaw) ? alertHumHighRaw : 85;
-  const alertHumLow = Number.isFinite(alertHumLowRaw) ? alertHumLowRaw : 0;
+  const heaterCutoff = readFloat('heaterCutoff', currentLimits.heater_cutoff_temp ?? 0);
+  const heaterTLow = readFloat('heaterTLow', currentAuto.heater_t_low ?? 18);
+  const heaterTHigh = readFloat('heaterTHigh', currentAuto.heater_t_high ?? 20);
+  const heaterNightTLow = readFloat('heaterNightTLow', currentAuto.heater_night_t_low ?? 17);
+  const heaterNightTHigh = readFloat('heaterNightTHigh', currentAuto.heater_night_t_high ?? 19);
+  const pumpDryThreshold = readFloat('pumpDryThreshold', currentAuto.pump_dry_threshold ?? 0);
+  const alertOfflineMinutes = readFloat('alertOfflineMinutes', currentAlerts.sensor_offline_minutes ?? 5);
+  const alertTempHigh = readFloat('alertTempHigh', currentAlerts.temp_high_c ?? 30);
+  const alertTempLow = readFloat('alertTempLow', currentAlerts.temp_low_c ?? 0);
+  const alertHumHigh = readFloat('alertHumHigh', currentAlerts.hum_high_pct ?? 85);
+  const alertHumLow = readFloat('alertHumLow', currentAlerts.hum_low_pct ?? 0);
   const soilCalibration = {};
   ['ch0', 'ch1', 'ch2', 'ch3'].forEach(channel => {
     const dryRaw = parseFloat(document.getElementById(calibrationInputId(channel, 'dry')).value);
@@ -1060,33 +1069,33 @@ function saveSettings() {
   const payload = {
     safe_mode: document.getElementById('safeModeToggle').checked,
     limits: {
-      pump_max_seconds: parseInt(document.getElementById('pumpMax').value, 10),
-      pump_cooldown_seconds: parseInt(document.getElementById('pumpCooldown').value, 10),
-      heater_max_seconds: parseInt(document.getElementById('heaterMax').value, 10),
+      pump_max_seconds: readInt('pumpMax', currentLimits.pump_max_seconds ?? 15),
+      pump_cooldown_seconds: readInt('pumpCooldown', currentLimits.pump_cooldown_seconds ?? 60),
+      heater_max_seconds: readInt('heaterMax', currentLimits.heater_max_seconds ?? 300),
       heater_cutoff_temp: heaterCutoff,
-      energy_kwh_low: parseFloat(document.getElementById('energyKwhLow').value),
-      energy_kwh_high: parseFloat(document.getElementById('energyKwhHigh').value),
-      energy_kwh_threshold: parseFloat(document.getElementById('energyKwhThreshold').value),
+      energy_kwh_low: readFloat('energyKwhLow', currentLimits.energy_kwh_low ?? 2.330),
+      energy_kwh_high: readFloat('energyKwhHigh', currentLimits.energy_kwh_high ?? 3.451),
+      energy_kwh_threshold: readFloat('energyKwhThreshold', currentLimits.energy_kwh_threshold ?? 240),
     },
     automation: {
       enabled: document.getElementById('autoEnabled').value === 'true',
-      lux_ok: parseInt(document.getElementById('luxOk').value, 10),
-      lux_max: parseInt(document.getElementById('luxMax').value, 10),
-      target_ok_minutes: parseInt(document.getElementById('targetMinutes').value, 10),
+      lux_ok: readInt('luxOk', currentAuto.lux_ok ?? 350),
+      lux_max: readInt('luxMax', currentAuto.lux_max ?? 0),
+      target_ok_minutes: readInt('targetMinutes', currentAuto.target_ok_minutes ?? 300),
       window_start: document.getElementById('windowStart').value,
       window_end: document.getElementById('windowEnd').value,
       reset_time: document.getElementById('resetTime').value,
-      min_on_minutes: parseInt(document.getElementById('minOnMinutes').value, 10),
-      min_off_minutes: parseInt(document.getElementById('minOffMinutes').value, 10),
-      max_block_minutes: parseInt(document.getElementById('maxBlockMinutes').value, 10),
-      manual_override_minutes: parseInt(document.getElementById('manualOverrideMinutes').value, 10),
+      min_on_minutes: readInt('minOnMinutes', currentAuto.min_on_minutes ?? 0),
+      min_off_minutes: readInt('minOffMinutes', currentAuto.min_off_minutes ?? 0),
+      max_block_minutes: readInt('maxBlockMinutes', currentAuto.max_block_minutes ?? 0),
+      manual_override_minutes: readInt('manualOverrideMinutes', currentAuto.manual_override_minutes ?? 0),
       heater_enabled: document.getElementById('heaterEnabled').value === 'true',
       heater_sensor: document.getElementById('heaterSensor').value,
       heater_t_low: heaterTLow,
       heater_t_high: heaterTHigh,
-      heater_max_minutes: parseInt(document.getElementById('heaterMaxMinutes').value, 10),
-      heater_min_off_minutes: parseInt(document.getElementById('heaterMinOffMinutes').value, 10),
-      heater_manual_override_minutes: parseInt(document.getElementById('heaterManualOverrideMinutes').value, 10),
+      heater_max_minutes: readInt('heaterMaxMinutes', currentAuto.heater_max_minutes ?? 0),
+      heater_min_off_minutes: readInt('heaterMinOffMinutes', currentAuto.heater_min_off_minutes ?? 0),
+      heater_manual_override_minutes: readInt('heaterManualOverrideMinutes', currentAuto.heater_manual_override_minutes ?? 0),
       heater_fan_required: document.getElementById('heaterFanRequired').value === 'true',
       heater_night_enabled: document.getElementById('heaterNightEnabled').value === 'true',
       heater_night_start: document.getElementById('heaterNightStart').value,
@@ -1097,28 +1106,28 @@ function saveSettings() {
       pump_soil_channel: document.getElementById('pumpSoilChannel').value,
       pump_dry_threshold: pumpDryThreshold,
       pump_dry_when_above: document.getElementById('pumpDryWhenAbove').value === 'true',
-      pump_pulse_seconds: parseInt(document.getElementById('pumpPulseSeconds').value, 10),
-      pump_max_daily_seconds: parseInt(document.getElementById('pumpMaxDailySeconds').value, 10),
+      pump_pulse_seconds: readInt('pumpPulseSeconds', currentAuto.pump_pulse_seconds ?? 5),
+      pump_max_daily_seconds: readInt('pumpMaxDailySeconds', currentAuto.pump_max_daily_seconds ?? 0),
       pump_window_start: document.getElementById('pumpWindowStart').value,
       pump_window_end: document.getElementById('pumpWindowEnd').value,
-      pump_manual_override_minutes: parseInt(document.getElementById('pumpManualOverrideMinutes').value, 10),
+      pump_manual_override_minutes: readInt('pumpManualOverrideMinutes', currentAuto.pump_manual_override_minutes ?? 0),
       fan_enabled: document.getElementById('fanEnabled').value === 'true',
-      fan_rh_high: parseInt(document.getElementById('fanRhHigh').value, 10),
-      fan_rh_low: parseInt(document.getElementById('fanRhLow').value, 10),
-      fan_max_minutes: parseInt(document.getElementById('fanMaxMinutes').value, 10),
-      fan_min_off_minutes: parseInt(document.getElementById('fanMinOffMinutes').value, 10),
-      fan_manual_override_minutes: parseInt(document.getElementById('fanManualOverrideMinutes').value, 10),
+      fan_rh_high: readInt('fanRhHigh', currentAuto.fan_rh_high ?? 70),
+      fan_rh_low: readInt('fanRhLow', currentAuto.fan_rh_low ?? 60),
+      fan_max_minutes: readInt('fanMaxMinutes', currentAuto.fan_max_minutes ?? 0),
+      fan_min_off_minutes: readInt('fanMinOffMinutes', currentAuto.fan_min_off_minutes ?? 0),
+      fan_manual_override_minutes: readInt('fanManualOverrideMinutes', currentAuto.fan_manual_override_minutes ?? 0),
       fan_night_enabled: document.getElementById('fanNightEnabled').value === 'true',
       fan_night_start: document.getElementById('fanNightStart').value,
       fan_night_end: document.getElementById('fanNightEnd').value,
-      fan_night_rh_high: parseInt(document.getElementById('fanNightRhHigh').value, 10),
-      fan_night_rh_low: parseInt(document.getElementById('fanNightRhLow').value, 10),
+      fan_night_rh_high: readInt('fanNightRhHigh', currentAuto.fan_night_rh_high ?? 75),
+      fan_night_rh_low: readInt('fanNightRhLow', currentAuto.fan_night_rh_low ?? 65),
       fan_periodic_enabled: document.getElementById('fanPeriodicEnabled').value === 'true',
-      fan_periodic_every_minutes: parseInt(document.getElementById('fanPeriodicEvery').value, 10),
-      fan_periodic_duration_minutes: parseInt(document.getElementById('fanPeriodicDuration').value, 10),
+      fan_periodic_every_minutes: readInt('fanPeriodicEvery', currentAuto.fan_periodic_every_minutes ?? 0),
+      fan_periodic_duration_minutes: readInt('fanPeriodicDuration', currentAuto.fan_periodic_duration_minutes ?? 0),
       fan_periodic_night_enabled: document.getElementById('fanPeriodicNightEnabled').value === 'true',
-      fan_periodic_night_every_minutes: parseInt(document.getElementById('fanPeriodicNightEvery').value, 10),
-      fan_periodic_night_duration_minutes: parseInt(document.getElementById('fanPeriodicNightDuration').value, 10),
+      fan_periodic_night_every_minutes: readInt('fanPeriodicNightEvery', currentAuto.fan_periodic_night_every_minutes ?? 0),
+      fan_periodic_night_duration_minutes: readInt('fanPeriodicNightDuration', currentAuto.fan_periodic_night_duration_minutes ?? 0),
       soil_calibration: soilCalibration,
     },
     alerts: {
