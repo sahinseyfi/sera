@@ -1,39 +1,39 @@
 {
   "channels": {
-    "R1_LIGHT_K1A": {
-      "gpio_pin": 5,
+    "R1_HEATER_FAN": {
+      "gpio_pin": 18,
       "active_low": true,
-      "description": "Kat1 Işık A",
+      "description": "Isıtıcı + Fan",
       "safe_default": "off"
     },
-    "R2_LIGHT_K1B": {
-      "gpio_pin": 6,
+    "R2_FAN_MAIN": {
+      "gpio_pin": 23,
       "active_low": true,
-      "description": "Kat1 Işık B",
+      "description": "12cm Havalandırma Fanı",
       "safe_default": "off"
     },
     "R3_PUMP": {
-      "gpio_pin": 13,
+      "gpio_pin": 24,
       "active_low": true,
       "description": "Pompa",
       "safe_default": "off"
     },
-    "R4_HEATER": {
-      "gpio_pin": 19,
+    "R4_FAN_L3": {
+      "gpio_pin": 25,
       "active_low": true,
-      "description": "Isıtıcı",
+      "description": "3.kat Fanı",
       "safe_default": "off"
     },
-    "R5_FAN": {
-      "gpio_pin": 26,
+    "R5_LIGHT_MID": {
+      "gpio_pin": 20,
       "active_low": true,
-      "description": "Fan",
+      "description": "3.kat Orta Işık",
       "safe_default": "off"
     },
-    "R6_POT_FAN": {
+    "R6_LIGHT_BACK": {
       "gpio_pin": 21,
       "active_low": true,
-      "description": "Saksı Fanı",
+      "description": "3.kat Arka Işık",
       "safe_default": "off"
     }
   }
