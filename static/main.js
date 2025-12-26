@@ -555,15 +555,6 @@ window.initControl = function() {
       fetch('/api/emergency_stop', { method: 'POST', headers: adminHeaders() }).then(() => poll());
     };
   }
-  document.querySelectorAll('.pump-preset').forEach(btn => {
-    btn.onclick = () => {
-      if (btn.disabled) return;
-      const sec = parseInt(btn.dataset.seconds, 10);
-      const pump = (state.status?.actuator_state && Object.keys(state.status.actuator_state).find(k => k.includes('PUMP')));
-      if (!pump) return alert('Pompa kanalı bulunamadı');
-      sendActuator(pump, true, sec).then(poll).catch(e => alert(e.message));
-    };
-  });
 };
 
 window.renderControl = function(data) {
@@ -594,15 +585,22 @@ window.renderControl = function(data) {
     wrap.innerHTML = '<div class="text-secondary small">Röleler yüklenemedi. Lütfen /api/status kontrol et.</div>';
     return;
   }
+  const cooldowns = data.cooldowns || {};
+  const pumpMax = Number(data.limits?.pump_max_seconds || 0);
   actuators.forEach(([name, info]) => {
     const col = document.createElement('div');
     col.className = 'col-md-4';
     const isPump = name.includes('PUMP');
     const isHeater = name.includes('HEATER');
     const heaterLocked = isHeater && !!sensorFaults.heater;
+    const pumpLocked = isPump && !!sensorFaults.pump;
     const heaterMax = data.limits?.heater_max_seconds;
     const heaterNote = isHeater && heaterMax ? `Isıtıcı max: ${heaterMax} sn` : '';
     const heaterLockNote = heaterLocked ? 'Isıtıcı kilitli: sensör hatası.' : '';
+    const pumpCooldown = isPump && cooldowns[name] != null ? Number(cooldowns[name]) : 0;
+    const pumpNote = isPump
+      ? (pumpCooldown > 0 ? `Pompa cooldown: ${Math.ceil(pumpCooldown)} sn` : 'Pompa hazır.')
+      : '';
     col.innerHTML = `
       <div class="card h-100">
         <div class="card-body d-flex flex-column gap-2">
@@ -614,9 +612,13 @@ window.renderControl = function(data) {
             <div class="text-secondary small">GPIO ${info.gpio_pin} · ${info.active_low ? 'active-low' : 'active-high'}</div>
             ${heaterNote ? `<div class="small text-secondary">${heaterNote}</div>` : ''}
             ${heaterLockNote ? `<div class="small text-danger">${heaterLockNote}</div>` : ''}
+            ${pumpNote ? `<div class="small text-secondary">${pumpNote}</div>` : ''}
+            ${pumpLocked ? '<div class="small text-danger">Pompa kilitli: sensör hatası.</div>' : ''}
           </div>
-          <div class="d-flex gap-2 mt-auto">
-            ${(isPump || heaterLocked) ? '' : '<button class="btn btn-success flex-fill" data-action="on">Aç</button>'}
+          <div class="d-flex gap-2 align-items-center mt-auto">
+            <input class="form-control form-control-sm w-25" data-field="sec" type="number" min="1" placeholder="sn">
+            <button class="btn btn-success flex-fill" data-action="on">Aç</button>
+            <button class="btn btn-outline-info flex-fill" data-action="pulse">Süreli</button>
             <button class="btn btn-outline-light flex-fill" data-action="off">Kapat</button>
           </div>
         </div>
@@ -624,44 +626,42 @@ window.renderControl = function(data) {
     col.querySelectorAll('button').forEach(btn => {
       btn.onclick = () => {
         const action = btn.dataset.action === 'on';
-        sendActuator(name, action).then(poll).catch(e => alert(e.message));
+        const input = col.querySelector('[data-field="sec"]');
+        const secRaw = input ? parseInt(input.value || '0', 10) : 0;
+        const seconds = Number.isFinite(secRaw) && secRaw > 0 ? secRaw : null;
+        if (btn.dataset.action === 'pulse') {
+          if (!seconds) return alert('Süreli için saniye gir.');
+          sendActuator(name, true, seconds).then(poll).catch(e => alert(e.message));
+          return;
+        }
+        if (btn.dataset.action === 'on') {
+          if (isPump) {
+            const finalSec = seconds || pumpMax || 5;
+            sendActuator(name, true, finalSec).then(poll).catch(e => alert(e.message));
+            return;
+          }
+          sendActuator(name, true, seconds || undefined).then(poll).catch(e => alert(e.message));
+          return;
+        }
+        sendActuator(name, false).then(poll).catch(e => alert(e.message));
       };
     });
     wrap.appendChild(col);
   });
   const lockControls = !!data.safe_mode;
-  wrap.querySelectorAll('button').forEach(btn => {
+  wrap.querySelectorAll('button, input').forEach(btn => {
     btn.disabled = lockControls;
   });
-  const pumpInfo = document.getElementById('pumpCooldownInfo');
-  const pumpNames = Object.keys(data.actuator_state || {}).filter(name => name.includes('PUMP'));
-  const cooldowns = data.cooldowns || {};
-  const firstPump = pumpNames[0];
-  const remaining = firstPump && cooldowns[firstPump] != null ? Number(cooldowns[firstPump]) : 0;
-  const pumpLocked = !!sensorFaults.pump;
-  if (pumpInfo) {
-    if (!firstPump) {
-      pumpInfo.textContent = 'Pompa kanalı bulunamadı.';
-    } else if (pumpLocked) {
-      pumpInfo.textContent = 'Pompa kilitli: sensör hatası.';
-    } else if (remaining > 0) {
-      pumpInfo.textContent = `Pompa cooldown: ${Math.ceil(remaining)} sn`;
-    } else {
-      pumpInfo.textContent = 'Pompa hazır.';
-    }
+  if (sensorFaults.pump) {
+    wrap.querySelectorAll('[data-action="on"], [data-action="pulse"]').forEach(btn => {
+      const card = btn.closest('.card');
+      if (!card) return;
+      const pill = card.querySelector('.pill');
+      if (!pill) return;
+      if (!String(pill.textContent || '').includes('PUMP')) return;
+      btn.disabled = true;
+    });
   }
-  const pumpMax = Number(data.limits?.pump_max_seconds || 0);
-  document.querySelectorAll('.pump-preset').forEach(btn => {
-    const sec = parseInt(btn.dataset.seconds || '0', 10);
-    btn.disabled = lockControls || pumpLocked || remaining > 0 || (pumpMax && sec > pumpMax);
-    if (pumpLocked) {
-      btn.title = 'Pompa kilitli: sensör hatası';
-    } else if (pumpMax && sec > pumpMax) {
-      btn.title = `Limit ${pumpMax} sn`;
-    } else {
-      btn.title = '';
-    }
-  });
   const emergencyBtn = document.getElementById('emergencyStop');
   if (emergencyBtn) emergencyBtn.disabled = false;
 };

@@ -1,6 +1,15 @@
 [
   {
     "date": "2025-12-27",
+    "title": "Kontrol ekranina sureli buton eklendi",
+    "summary": "Her roleyi ac/kapat ve sureli calistirabilirsin.",
+    "details": [
+      "Pompa icin de Ac butonu ve sureli calistirma var.",
+      "Pompa durum bilgisi kart icinde gorunur."
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "LCD otomatik ekran duzeni sadeleştirildi",
     "summary": "LCD satirlari sicaklik, nem, isik ve toprak bilgisini net gosterir.",
     "details": [
