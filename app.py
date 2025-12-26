@@ -616,7 +616,7 @@ class LCDManager:
             self.lcd = None
             return
         try:
-            addr_raw = str(self.config.get("lcd_addr", "0x3F"))
+            addr_raw = str(self.config.get("lcd_addr", "0x27"))
             try:
                 addr = int(addr_raw, 0)
             except Exception:
@@ -692,22 +692,31 @@ class LCDManager:
         lux = readings.get("bh1750", {}) if isinstance(readings.get("bh1750"), dict) else {}
         soil = readings.get("soil", {}) if isinstance(readings.get("soil"), dict) else {}
 
-        temp = dht.get("temperature")
-        hum = dht.get("humidity")
-        if temp is None or hum is None:
-            line0 = "T: --.-C  N: --.-%"
-        else:
-            line0 = f"T:{float(temp):4.1f}C  N:{float(hum):4.1f}%"
+        def fmt_float(value: Any, width: int, prec: int) -> Optional[str]:
+            try:
+                return f"{float(value):{width}.{prec}f}"
+            except (TypeError, ValueError):
+                return None
 
-        lux_val = lux.get("lux")
-        line1 = f"Isik: {int(lux_val):5d} lux" if lux_val is not None else "Isik:  ----- lux"
+        def fmt_int(value: Any, width: int) -> Optional[str]:
+            try:
+                return f"{int(value):{width}d}"
+            except (TypeError, ValueError):
+                return None
 
+        temp = fmt_float(dht.get("temperature"), 4, 1) or "--.-"
+        hum = fmt_float(dht.get("humidity"), 3, 0) or "--"
+        line0 = f"Sic:{temp}C Nem:{hum}%"
+
+        lux_val = fmt_int(lux.get("lux"), 4) or "----"
         soil_raw = soil.get("ch0")
         soil_pct = self._soil_percent("ch0", soil_raw)
-        if soil_pct is None:
-            line2 = f"Toprak: {int(soil_raw):4d}" if soil_raw is not None else "Toprak:   --"
-        else:
-            line2 = f"Toprak: {soil_pct:3d} %"
+        soil_pct_str = f"{soil_pct:3d}" if soil_pct is not None else "--"
+        line1 = f"Isik:{lux_val}lx Top:{soil_pct_str}%"
+
+        ds_temp = fmt_float((readings.get("ds18b20") or {}).get("temperature"), 4, 1) or "--.-"
+        soil_raw_str = fmt_int(soil_raw, 4) or "----"
+        line2 = f"DS:{ds_temp}C Ham:{soil_raw_str}"
 
         safe_mode = bool(data.get("safe_mode"))
         line3 = "SAFE MODE" if safe_mode else "Sistem: AKTIF"

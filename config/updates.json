@@ -1,6 +1,17 @@
 [
   {
     "date": "2025-12-27",
+    "title": "LCD otomatik ekran duzeni sadeleştirildi",
+    "summary": "LCD satirlari sicaklik, nem, isik ve toprak bilgisini net gosterir.",
+    "details": [
+      "1. satir: Sicaklik ve nem",
+      "2. satir: Isik ve toprak yuzdesi",
+      "3. satir: DS18B20 ve toprak ham deger",
+      "4. satir: Sistem durumu"
+    ]
+  },
+  {
+    "date": "2025-12-27",
     "title": "LCD kutuphanesi kuruldu",
     "summary": "LCD yazdirma icin gerekli RPLCD kutuphanesi eklendi.",
     "details": [
