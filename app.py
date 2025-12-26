@@ -1538,71 +1538,94 @@ def load_channel_config() -> List[Dict[str, Any]]:
             normalized.append(entry)
         return normalized
 
-    if CHANNEL_CONFIG_PATH.exists():
-        with CHANNEL_CONFIG_PATH.open() as f:
-            return normalize(json.load(f))
     default_channels = [
         {
-            "name": "R1_LIGHT_K1A",
-            "gpio_pin": 21,
+            "name": "R1_HEATER_FAN",
+            "gpio_pin": 18,
             "active_low": True,
-            "description": "LED Bar",
+            "description": "Isıtıcı + Fan",
             "power_w": 0,
             "quantity": 1,
-            "voltage_v": None,
+            "voltage_v": 12,
+            "role": "heater",
             "enabled": True,
         },
         {
-            "name": "R2_LIGHT_K1B",
-            "gpio_pin": 20,
+            "name": "R2_FAN_MAIN",
+            "gpio_pin": 23,
             "active_low": True,
-            "description": "LED Bar 2",
+            "description": "12cm Havalandırma Fanı",
             "power_w": 0,
             "quantity": 1,
-            "voltage_v": None,
+            "voltage_v": 12,
+            "role": "fan",
             "enabled": True,
         },
         {
             "name": "R3_PUMP",
-            "gpio_pin": 16,
+            "gpio_pin": 24,
             "active_low": True,
-            "description": "Pump",
+            "description": "Pompa",
             "power_w": 0,
             "quantity": 1,
-            "voltage_v": None,
+            "voltage_v": 12,
+            "role": "pump",
             "enabled": True,
         },
         {
-            "name": "R4_HEATER",
-            "gpio_pin": 12,
+            "name": "R4_FAN_L3",
+            "gpio_pin": 25,
             "active_low": True,
-            "description": "Heater",
+            "description": "3.kat Fanı",
             "power_w": 0,
             "quantity": 1,
-            "voltage_v": None,
+            "voltage_v": 12,
+            "role": "fan",
             "enabled": True,
         },
         {
-            "name": "R5_FAN",
-            "gpio_pin": 7,
+            "name": "R5_LIGHT_MID",
+            "gpio_pin": 20,
             "active_low": True,
-            "description": "Fan",
+            "description": "3.kat Orta Işık",
             "power_w": 0,
             "quantity": 1,
-            "voltage_v": None,
+            "voltage_v": 12,
+            "role": "light",
             "enabled": True,
         },
         {
-            "name": "R6_POT_FAN",
-            "gpio_pin": 8,
+            "name": "R6_LIGHT_BACK",
+            "gpio_pin": 21,
             "active_low": True,
-            "description": "Pot Fan",
+            "description": "3.kat Arka Işık",
             "power_w": 0,
             "quantity": 1,
-            "voltage_v": None,
+            "voltage_v": 12,
+            "role": "light",
             "enabled": True,
         },
     ]
+    if CHANNEL_CONFIG_PATH.exists():
+        try:
+            with CHANNEL_CONFIG_PATH.open() as f:
+                data = json.load(f)
+            current = normalize(data if isinstance(data, list) else [])
+        except Exception:
+            current = normalize([])
+        current_map = {str(item.get("name", "")).upper(): item for item in current}
+        merged = list(current)
+        changed = False
+        for default in normalize(default_channels):
+            name = str(default.get("name", "")).upper()
+            if name and name not in current_map:
+                merged.append(default)
+                changed = True
+        if changed:
+            CONFIG_DIR.mkdir(exist_ok=True)
+            with CHANNEL_CONFIG_PATH.open("w") as f:
+                json.dump(merged, f, indent=2)
+        return merged
     CONFIG_DIR.mkdir(exist_ok=True)
     with CHANNEL_CONFIG_PATH.open("w") as f:
         json.dump(default_channels, f, indent=2)
