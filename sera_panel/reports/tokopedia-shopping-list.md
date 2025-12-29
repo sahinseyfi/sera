@@ -31,6 +31,12 @@ Amaç: daha güvenli güç dağıtımı, daha temiz kablolama, daha iyi sensör 
 | TVS diyot (12V hat) | 12V otomotiv sınıfı TVS (transient absorber) | 1–2 | Fan/pompa anahtarlamada oluşan sıçramaları bastırır | `TVS diode 12V` |
 | 12V fanlar (tamamlamak) | Tercihen **4‑wire PWM** (hız kontrol istersek), ball bearing; aynı model seç | 3–4 | Hedef kurulum: Kat1 fan + Kat2 fan + egzoz + (opsiyonel) fide fanı; 1 yedek iyi olur | `fan 12V PWM 4 wire`, `fan 12V 120mm` |
 
+### Aday ürün (bulundu): HAT2195R 8‑Channel MOSFET Driver
+- Ürün adı: “Module Driver Mosfet 8-Channel 30V 18A RENESAS HAT2195R 8Ch MOS DC PWM Power Switching”
+- İlan teknik notları: PC817S optocoupler, “anti‑feedback diode” (flyback), active‑high, 12/24V (max 30V)
+- Fiyat örneği: ~`Rp131.000` (satıcıya/kur/indirimlere göre değişebilir)
+- Siparişten önce kontrol: “3.3V trigger / 3.3–5V input” ibaresi veya ürün fotoğraflarında giriş pinleri (VCC/GND/IN) netliği
+
 > Röle kartların (1/2/4/8 kanal) var; AC yük/izolasyon gereken yerlerde hâlâ değerli.  
 > DC LED/fan işini MOSFET’e taşımak genelde daha temiz oluyor.
 
