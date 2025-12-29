@@ -301,6 +301,20 @@ NotificationConfig = {
 - Maintain backward compatibility for old config keys where possible.
 - Provide a one-time mapping of existing channels to zones.
 
+## 26. Future-Proofing Checklist
+- Catalog-first config: sensors, actuators, and zones are defined in a single catalog with metadata.
+- Config versioning: store `config_version` and run migrations on load.
+- Generic telemetry log: avoid fixed columns; use metric key/value rows or JSON blobs.
+- Rule-driven automation: add a rule engine instead of hard-coded flows.
+- Schema-driven UI: render forms from capability metadata, not hard-coded inputs.
+- Unified calibration: scale/offset/polynomial for all analog sensors (LDR, soil).
+- Safety policy engine: one place for max-on, min-off, dependencies, stale fallback.
+- Zone templates: create a zone from a template (LED1/LED2/fan/soil/LDR) in one action.
+- Integration adapters: GPIO/HA/MQTT/Webhook behind a common interface.
+- Diagnostics page: I2C scan, HA status, last error, uptime, and data age.
+- Notification rules: per-zone alert rules, quiet hours, daily digest.
+- Audit and rollback: track config edits with who/when + allow rollback.
+
 ---
 
 End of spec.
