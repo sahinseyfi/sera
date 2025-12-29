@@ -58,8 +58,8 @@ En güvenli kullanım: önce **sensör düğümü** olarak başla; kritik aktüa
 
 | Ürün | Önerilen özellik | Adet | Neden? | Tokopedia arama |
 |---|---|---:|---|---|
-| ESP32 geliştirme kartı | ESP32‑WROOM‑32 / DevKit V1, USB’li, 4MB flash (CH340/CP2102) | 2 | 1’i deneme/masa, 1’i seraya; ileride “kat düğümü” veya “fide kutusu” sensör düğümü | `ESP32 DevKit V1`, `ESP32 WROOM 32`, `modul ESP32` |
-| DC‑DC step‑down (opsiyonel) | 12V→5V **3A** buck (kaliteli) | 1–2 | ESP32’yi 12V ana hattan beslemek için (uzakta düğüm kurarsan) | `buck converter 12V 5V 3A`, `DC DC step down 12V to 5V` |
+| ESP32 geliştirme kartı | ESP32‑WROOM‑32 / DevKit V1, USB’li, 4MB flash (CH340/CP2102) | 4 | KAT1 + KAT2 + FIDE için 3 düğüm + 1 yedek (Wi‑Fi/sensör/IO dağıtımı) | `ESP32 DevKit V1`, `ESP32 WROOM 32`, `modul ESP32` |
+| DC‑DC step‑down (opsiyonel) | 12V→5V **3A** buck (kaliteli) | 3–4 | Her ESP32 düğümünü 12V ana hattan stabil 5V ile beslemek için | `buck converter 12V 5V 3A`, `DC DC step down 12V to 5V` |
 
 ---
 
