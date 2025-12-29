@@ -4,7 +4,7 @@ Bu dosya; elindeki ekipmanları **model/özellik + adet + fiyat** ile kayıt alt
 Fiyatlar, senin paylaştığın birim fiyatlardır (kargo/indirim değişebilir).
 
 ## Özet
-- Kalem sayısı: 30 (1 kalemde fiyat eksik)
+- Kalem sayısı: 43 (14 kalemde fiyat eksik)
 - Toplam tutar (fiyatı bilinenler): 6.389,16 TL
 
 ## 0) Kontrol Bilgisayarı
@@ -82,7 +82,27 @@ Fiyatlar, senin paylaştığın birim fiyatlardır (kargo/indirim değişebilir)
 |---|---|---:|---:|---:|---:|---|
 | 4 Katlı Portatif Bahçe Serası | Gardener 16040 (Ürün Kodu: 61483255) | 69×49×158 cm, PVC kılıf, metal boru iskelet | 1 | 3.060,00 | 3.060,00 | Ana sera gövdesi |
 
+## 9) Eski Projeden Kalanlar (Fiyat Bilinmiyor)
+
+Bu bölüm, elinde olup fiyatı paylaşılmamış parçaları “kayıt altına almak” için var.
+
+| Ürün | Model/Kod | Teknik detay | Adet | Birim (TL) | Toplam (TL) | Not / Kullanım |
+|---|---|---:|---:|---:|---:|---|
+| Mini DC diyaframlı sıvı pompası + DC motor | — | Muhtemelen 12V, diyafram pompa kafası (giriş/çıkış portlu) + fırçalı DC motor | 1 | — | — | Kablo/lehimi kopuk görünüyor; akım/debi test edilecek |
+| Yan keski / pense | — | Kablo kesme/soyma, tutma için el aleti | 1 | — | — | Montaj/servis |
+| 4×4 Matris Buton Takımı (Keypad) | — | 16 tuşlu, S1…S16, satır‑sütun okuma | 1 | — | — | Prototip kontrol arayüzleri |
+| DC motor sürücü modülü | L298N | 2 kanallı H‑bridge, PWM ile hız, klemensli | 2 | — | — | Motor prototip; sera finalinde zorunlu değil |
+| Röle kartı (8 kanal) | Tongling JQC‑3FF‑S‑Z | 12V bobin, IN1…IN8 girişli modül | 1 | — | — | Çoklu yük anahtarlama; lojik seviye/sürücü ihtiyacı kontrol edilmeli |
+| Röle kartı (4 kanal) | Songle SRD‑12VDC‑SL‑C | 12V bobin, 4 kanal modül | 1 | — | — | Yük anahtarlama; lojik seviye/sürücü ihtiyacı kontrol edilmeli |
+| Röle kartı (2 kanal) | Tongling JQC‑3FF‑S‑Z | 12V bobin, 2 kanal modül | 1 | — | — | Yük anahtarlama; lojik seviye/sürücü ihtiyacı kontrol edilmeli |
+| Röle modülü (1 kanal) | Songle SRD‑5VDC‑SL‑C | 5V bobin, tek kanal modül | 1 | — | — | Küçük testler için uygun |
+| Lazer verici modülü | KY‑008 | 3 pin (S/+/-) lazer diyot modülü | 1 | — | — | Sera için şart değil; deney/hizalama |
+| RC Servo motor | Futaba S3003 | Standart servo, PWM ile açı kontrol | 1 | — | — | Mekanik projeler/deney |
+| Sıcaklık‑Nem sensörü modülü | DHT11 | 3 pin modül, düşük hassasiyet | 1 | — | — | Yedek; hedef sensör DHT22/SHT31 |
+| Redüktörlü DC motor | — | Dişli kutulu motor, yüksek tork/düşük hız | 1 | — | — | Mekanik projeler/deney |
+| Ayarlı trimpotlu modül | — | Üzerinde trimpot olan küçük modül (model belirsiz) | 1 | — | — | Model/fonksiyon foto ile netleşecek |
+
 ## Notlar / Açık Noktalar
 - Kat fanı sayısı ve “egzoz fan” sayısı proje hedefinde 3 adet gibi duruyor (Kat1 fan, Kat2 fan, egzoz fan). Envanterde şu an 1 adet 120mm fan var.
-- Röle kartı şu an 2 kanal. Projede hedef 10+ çıkış; üretim için MOSFET kartı veya 16 kanal çözüm gerekecek.
+- Röle tarafında: 2 kanal 5V röle kartı + (eski proje) 1/2/4/8 kanal röle modülleri var. Final tasarımda çıkış sayısına ve yük tipine göre MOSFET/SSR/röle seçimi netleşecek.
 - LDR’ler listede yok (Kat1/Kat2 için 2 adet). Eğer aldıysan model/fiyatını ekleyebilirim.
