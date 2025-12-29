@@ -77,7 +77,6 @@ Fiyatlar, senin paylaştığın birim fiyatlardır (kargo/indirim değişebilir)
 | 4 Katlı Portatif Bahçe Serası | Gardener 16040 (Ürün Kodu: 61483255) | 69×49×158 cm, PVC kılıf, metal boru iskelet | 1 | 3.060,00 | 3.060,00 | Ana sera gövdesi |
 
 ## Notlar / Açık Noktalar
-- Kat fanı sayısı ve “egzoz fan” sayısı proje hedefinde 3 adet gibi duruyor (Kat1 fan, Kat2 fan, egzoz fan). Envanterde şu an 1 adet 120mm fan var.\n
-- Röle kartı şu an 2 kanal. Projede hedef 10+ çıkış; üretim için MOSFET kartı veya 16 kanal çözüm gerekecek.\n
-- LDR’ler listede yok (Kat1/Kat2 için 2 adet). Eğer aldıysan model/fiyatını ekleyebilirim.\n
-
+- Kat fanı sayısı ve “egzoz fan” sayısı proje hedefinde 3 adet gibi duruyor (Kat1 fan, Kat2 fan, egzoz fan). Envanterde şu an 1 adet 120mm fan var.
+- Röle kartı şu an 2 kanal. Projede hedef 10+ çıkış; üretim için MOSFET kartı veya 16 kanal çözüm gerekecek.
+- LDR’ler listede yok (Kat1/Kat2 için 2 adet). Eğer aldıysan model/fiyatını ekleyebilirim.
