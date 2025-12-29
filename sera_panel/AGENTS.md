@@ -52,6 +52,25 @@ Ben **Sahin**. “**AKILLI SERA – Momo & Nova Station**” adlı projeyi geli�
 - Dosya düzenleme gerekiyorsa, “şunu bul değiştir” demeden terminal komutlarıyla otomatik yap.
 - Riskli komutlar (`sudo`, `gpioset`, `systemctl stop`) çalıştırmadan önce **ne yapacağını ve etkisini** net söyle.
 - Her değişiklikten sonra çalıştırılabilir doğrulama komutları öner (örn. `pytest`, `curl`, script testleri).
+- Commit/push istenirse önce `git status` kontrol et; **sadece ilgili dosyaları** stage et ve alakasız değişiklikler varsa kullanıcıya sor.
+- Toplu silme/yeniden yazma (örn. `reports/` altı) gibi işlemleri **açık talep olmadan** yapma; gerekirse onay iste.
+
+## UX ve ürün prensipleri (hata tekrarı olmasın)
+- **Bilgi önceliği:** Her sayfada "en önemli 3 durum" görünür olmalı; detaylar ikincil katmanda kalmalı.
+- **Riskli aksiyonlar:** Pompa/ısıtıcı gibi kritik komutlarda ikili onay + geri sayım görseli zorunlu.
+- **Otomasyon gerekçesi:** Her otomasyon kararında "neden bu karar verildi" metni/etiketi sun.
+- **Bildirim + audit:** Kritik eşiklerde bildirim (email/telegram) ve "kim-ne zaman-ne yaptı" audit kaydı olmadan özellik kapanmış sayılır.
+- **İlk kurulum akışı:** Yeni kullanıcı için 5 dk içinde ilk okuma hedefi; ayarlar basit/gelismis mod ile ayrılmalı.
+- **Veri yönetimi:** Ayar yedekleme/geri yükleme ve veri saklama/temizleme politikası belirtilmeden raporlama genişletme.
+- **Terminoloji standardı:** Lux/lx, °C, %, kWh, dakika/saniye gibi birimler tek formatta.
+- **Legacy ayrımı:** `sera_panel` sadece geriye dönük destek; yeni UX/özellikler ana panelde.
+
+## Yol haritası uyumu
+- Faz 0: Menü etiket temizliği, terminoloji düzeltmeleri, basit/gelismis görünüm.
+- Faz 1: Durum özeti kutusu, kritik aksiyon onayı, "son komutlar + neden" paneli, mobil iyileştirme, mikro yardım.
+- Faz 2: Bildirim kanalları, audit log, otomatik SAFE MODE, ayar yedek/geri yükleme.
+- Faz 3: Otomasyon karar açıklamaları, senaryo profilleri, günlük toplam limit raporu, bağımlılıkların görünürleştirilmesi.
+- Faz 4: Hedef-sapma trendleri, haftalık öneriler (sadece gözlem), veri kalitesi dashboardu.
 
 ## Hedef modüller (yol haritası)
 - Sensör okuma servisleri (DHT22, DS18B20, BH1750, ADS1115)
@@ -65,3 +84,9 @@ Ben **Sahin**. “**AKILLI SERA – Momo & Nova Station**” adlı projeyi geli�
 - Yeni donanım önermek (zorunlu olmadıkça).
 - Pompa/ısıtıcıyı onaysız uzun süre çalıştırmak.
 - Ağ güvenliği zayıf ayarlar (rastgele port açma, şifreleri düz metin yazma).
+
+## Kalite ve kabul kriterleri
+- Kritik akışlar için SIMULATION_MODE testleri olmadan PR yapılmaz.
+- UI smoke testleri: `/dashboard`, `/control`, `/settings`, `/reports` temel yüklenme kontrolü.
+- SAFE MODE ve `emergency_stop` regresyon kontrolü yapılır.
+- Başarı kriterleri: yeni kullanıcı 5 dk içinde ilk okuma görür; kritik alarm 60 sn içinde bildirilir; günlük rapor "ne oldu + ne yapmalıyım" tek sayfada cevaplar.
