@@ -31,23 +31,22 @@ architecture, layouts, states, and detailed component behavior.
 - EXHAUST FAN: greenhouse vent fan to outside.
 
 ## 5. Information Architecture (Global Nav)
-1) Overview
-2) Zones
-3) Control
-4) Automation
-5) Sensors
-6) LCD / Display
-7) Logs & Trends
-8) Reports
-9) Updates
-10) Notes
-11) Settings
-12) Help
+Desktop (top nav, prioritized by daily use)
+1) Overview (read-only)
+2) Zones (daily operations)
+3) Control (manual actions, safety-first)
+4) History (trends + logs + reports)
+5) Settings (advanced configuration)
+
+Mobile (bottom nav)
+- Overview, Zones, Control, History, More
+- More contains: Settings, Help, Updates
 
 Notes:
 - Overview is read-only summary.
 - Zones is the main operational hub.
 - Control is explicit manual actuation with safety.
+- Keep top-level navigation small; everything else is a sub-page under Settings or History.
 
 ## 6. Data Model (Front-End)
 
@@ -166,6 +165,7 @@ NotificationConfig = {
   - Quick ON/OFF and duration (if allowed)
 
 ## 11. Automation Page
+This is implemented as a sub-page under Settings: **Settings > Automation**.
 
 ### 11.1 Lux Automation (Per Zone)
 - Sensor: select LDR or BH1750.
@@ -189,6 +189,7 @@ NotificationConfig = {
 - If enabled and SAFE MODE off, fan stays ON unless manual override.
 
 ## 12. Sensors Page
+This is implemented as a sub-page under Settings: **Settings > Sensors & Calibration**.
 
 ### 12.1 Sensor List
 - Table or cards with:
@@ -208,6 +209,7 @@ NotificationConfig = {
 - Step 4: Confirm converted lux value.
 
 ## 13. LCD / Display Page
+This is implemented as a sub-page under Settings: **Settings > LCD / Display**.
 
 ### 13.1 LCD Settings
 - Enable/disable, mode (auto/template/manual), address, port, expander, charmap.
@@ -221,11 +223,13 @@ NotificationConfig = {
 - Optional auto-rotate between zone views.
 
 ## 14. Logs & Trends Page
+This is implemented as the top-level **History** page.
 
 ### 14.1 Filters
 - Zone selector
 - Metric selector
 - Time range (24h, 7d)
+- Log type selector (sensor log / event log / actuator log)
 
 ### 14.2 Chart
 - Single main chart with legend.
@@ -233,8 +237,10 @@ NotificationConfig = {
 
 ### 14.3 Export
 - CSV download for selected filter.
+- Quick links: last 1h / 6h / 24h.
 
 ## 15. Reports Page
+This is implemented as a section inside **History** (tab or route): **History > Reports**.
 
 ### 15.1 Daily Summary
 - One page per day with zone summary.
@@ -244,22 +250,30 @@ NotificationConfig = {
 - Trends and improvements per zone.
 
 ## 16. Updates Page
-- User-friendly changelog from config.
+This is implemented inside Settings (not top-level): **Settings > Updates & Notes**.
+- User-friendly changelog from config (`config/updates.json`).
 - Latest update date shown at top.
 
 ## 17. Notes Page
+This is implemented inside Settings (not top-level): **Settings > Updates & Notes**.
 - Curated improvement ideas grouped by topic.
 - Acts as a lightweight roadmap for internal use.
 
 ## 18. Settings Page
-- Safe mode toggle.
-- Limits (pump, heater).
-- Alerts thresholds.
-- Energy pricing (kWh tiers).
-- Notifications (Telegram/Email enable, severity, cooldown, test send).
-- Retention (cleanup schedule, manual cleanup).
-- Backup/restore (JSON import/export).
-- Admin token status + input.
+Settings is a shell with sub-pages. Default view should show the most-used controls first.
+
+### 18.1 Settings Sections (Recommended Order)
+1) Safety & Limits (SAFE MODE, pump/heater max, heater cutoff, dependencies)
+2) Automation (heater, exhaust fan, lux, pump)
+3) Sensors & Calibration (DHT/SHT, ADS1115 map, LDR calibration, DS18 enable)
+4) Devices & Channels (GPIO/HA mapping, roles, zones)
+5) Notifications (Telegram/Email enable, severity, cooldown, test send)
+6) Backup & Retention (export/import, retention policy, manual cleanup)
+7) LCD / Display
+8) Integrations (Home Assistant status, mapping hints)
+9) Updates & Notes
+10) Help / FAQ
+11) System (restart, version, diagnostics)
 
 ## 19. Notifications & Integrations
 - Telegram + Email supported; show readiness in UI.
