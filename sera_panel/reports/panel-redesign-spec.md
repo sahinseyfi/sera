@@ -137,6 +137,33 @@ EventLog = {
 }
 ```
 
+### 6.7 Location & Weather
+```
+LocationConfig = {
+  label: string,           // e.g. "Silivri Sera"
+  lat: number,
+  lon: number,
+  tz: string
+}
+
+WeatherSnapshot = {
+  status: 'ok' | 'missing' | 'disabled',
+  source: string,          // e.g. 'open-meteo'
+  updated_ts?: number,
+  current?: {
+    temp_c?: number,
+    rh_pct?: number,
+    precipitation_mm?: number,
+    cloud_cover_pct?: number,
+    wind_ms?: number
+  },
+  daily?: {
+    sunrise?: string,
+    sunset?: string
+  }
+}
+```
+
 ## 7. Global UI Layout
 - Top bar: brand + SAFE MODE indicator + data age.
 - Secondary strip: last update time, stale warning, alert count.
@@ -147,10 +174,11 @@ EventLog = {
 
 ### 8.1 Sections
 1) System Summary (safe mode, data age, alerts)
-2) Global Sensors (SERA temp/hum + BH1750 lux)
-3) Zones Snapshot (KAT1 / FIDE / KAT2)
-4) Active Automation Summary
-5) Alerts (last 5)
+2) Outdoor Weather (location-based, cached)
+3) Global Sensors (SERA temp/hum + BH1750 lux)
+4) Zones Snapshot (KAT1 / FIDE / KAT2)
+5) Active Automation Summary
+6) Alerts (last 5)
 
 ### 8.2 Zone Snapshot Cards
 - Header: zone label + health badge.
@@ -301,14 +329,15 @@ Settings is a shell with sub-pages. Default view should show the most-used contr
 1) Safety & Limits (SAFE MODE, pump/heater max, heater cutoff, dependencies)
 2) Automation (heater, exhaust fan, lux, pump)
 3) Sensors & Calibration (DHT/SHT, ADS1115 map, LDR calibration, DS18 enable)
-4) Devices & Channels (GPIO/HA mapping, roles, zones)
-5) Notifications (Telegram/Email enable, severity, cooldown, test send)
-6) Backup & Retention (export/import, retention policy, manual cleanup)
-7) LCD / Display
-8) Integrations (Home Assistant status, mapping hints)
-9) Updates & Notes
-10) Help / FAQ
-11) System (restart, version, diagnostics)
+4) Location & Weather (lat/lon/tz, geocoding search, cache status)
+5) Devices & Channels (GPIO/HA mapping, roles, zones)
+6) Notifications (Telegram/Email enable, severity, cooldown, test send)
+7) Backup & Retention (export/import, retention policy, manual cleanup)
+8) LCD / Display
+9) Integrations (Home Assistant status, mapping hints)
+10) Updates & Notes
+11) Help / FAQ
+12) System (restart, version, diagnostics)
 
 ## 19. Notifications & Integrations
 - Telegram + Email supported; show readiness in UI.
@@ -346,6 +375,9 @@ Settings is a shell with sub-pages. Default view should show the most-used contr
 - `POST /api/sensors`: update sensor config.
 - `POST /api/calibrate/ldr`: save LDR scale factor.
 - `GET /api/trends`: unified trend data by zone/metric.
+- `GET /api/weather`: cached current + daily summary for configured location.
+- `GET /api/geocode`: search location (city/address) and return candidates (optional).
+- `POST /api/location`: update location config (label/lat/lon/tz).
 - `GET /api/updates`: UI updates feed.
 - `POST /api/notifications/test`: test send for Telegram/Email.
 - `GET /api/backup` and `POST /api/backup/restore`: backup/restore.

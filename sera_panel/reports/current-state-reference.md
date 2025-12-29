@@ -131,6 +131,7 @@ as a reference before the upcoming redesign.
 - SQLite database: `data/sera.db`.
 - `sensor_log` table (fixed columns for DHT/DS/Lux/Soil).
 - Daily CSV logs in `data/sensor_logs/`.
+- Weather cache files in `data/cache/weather/` (per-day JSON, used by reports).
 
 ## Config
 - `config/channels.json`: channels with role, GPIO, active_low, HA entity.
@@ -138,6 +139,12 @@ as a reference before the upcoming redesign.
 - `config/notifications.json`: notification settings.
 - `config/retention.json`: retention/cleanup settings.
 - `config/updates.json`: UI updates feed.
+- `config/reporting.json`: report thresholds + location (`SERA_LAT`, `SERA_LON`, `SERA_TZ`) for weather-based comparisons.
+
+## Weather (Current)
+- Daily/weekly reports fetch external weather via Open-Meteo using `config/reporting.json` location values.
+- Data includes sunrise/sunset plus hourly fields like outside temp/humidity, precipitation, cloud cover, wind.
+- Weather is cached on disk per day to reduce API calls and keep reports fast.
 
 ## Home Assistant Integration
 - Channels can be `backend: homeassistant` with `ha_entity_id`.

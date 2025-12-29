@@ -41,6 +41,17 @@ It is aligned with the decision log and the new zone-first UI.
 - Quiet hours and daily digest options.
 - Clear UI status for missing env vars.
 
+## Weather & Location (User-Friendly)
+- Weather is already used for reports (Open-Meteo); make it configurable from the UI.
+- Add **Settings > Location & Weather**:
+  - Search by city/address using Open-Meteo Geocoding API (no key).
+  - Store `lat/lon/timezone` + a friendly label (e.g., “Silivri Sera”).
+  - Show what data is used (sunrise/sunset, outside temp/humidity, precipitation, cloud cover).
+- Add an **Overview** weather card:
+  - Current outside temp/humidity, precipitation chance, wind, sunrise/sunset.
+  - Clear badge if weather data is missing/offline.
+- Cache weather responses and support “disable external weather” mode.
+
 ## LCD / Display
 - Zone-aware LCD templates (SERA + KAT1 + KAT2 + FIDE rotation).
 - New tokens: zone-specific temp/hum/soil/lux, data_age, alerts count.
