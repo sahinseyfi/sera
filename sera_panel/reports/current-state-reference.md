@@ -6,12 +6,12 @@ as a reference before the upcoming redesign.
 ## Scope
 - Main panel lives in repo root (`app.py`, `templates/`, `static/`).
 - `sera_panel/` is legacy/test content.
-- Raspberry Pi 4 + Flask + GPIO/HA control.
+- Raspberry Pi 4 + Flask + GPIO control (HA integration is planned for the redesign).
 
 ## High-Level Architecture
 - Flask app in `app.py`.
 - UI templates in `templates/` and JS in `static/main.js`.
-- Hardware abstraction for GPIO and Home Assistant.
+- Hardware abstraction for GPIO (single backend).
 - Sensor manager reads DHT22, DS18B20, BH1750, ADS1115.
 - Automation engine handles lux, heater, pump, fan logic.
 
@@ -24,7 +24,7 @@ as a reference before the upcoming redesign.
 - Automation badge legend (active, override, lux error, max lux, off).
 - Charts: metric selector + 24h/7d range + CSV download.
 - Chart footer: min/max/last/count/last update.
-- Actuator state list (state, last change, reason, backend info).
+- Actuator state list (state, last change, reason).
 - Alerts list (latest 5).
 - Energy estimate (24h/7d totals + per-channel breakdown; note for timed-only channels).
 - Sensor health list (last OK, offline duration, offline limit note).
@@ -38,9 +38,6 @@ as a reference before the upcoming redesign.
 - Recent command list with reasons.
 
 ### Settings
-- Panel restart button (systemd/exec/signal fallback).
-- Advanced mode toggle (beginner vs advanced sections).
-- Initial setup checklist (sensor/role mapping, token, limits).
 - Admin token input + status (stored in browser).
 - SAFE MODE toggle.
 - Limits: pump max + cooldown, heater max + cutoff.
@@ -53,13 +50,10 @@ as a reference before the upcoming redesign.
   - Soil calibration table with dry/wet quick capture buttons.
 - Alert thresholds (offline, temp/hum high/low).
 - Energy price settings (kWh tiers).
-- Notifications (Telegram/Email enable, level, cooldown, readiness status).
-- Retention/cleanup settings + manual cleanup trigger.
-- Backup/restore (JSON export/import; restore forces SAFE MODE).
 
 ### Hardware
 - Channel mapping table:
-  - name, active, role, backend (GPIO/HA), GPIO pin, active low, HA entity.
+  - name, active, role, GPIO pin, active low.
   - description, power, quantity, total power, voltage, notes.
 - Sensor settings:
   - DHT22 GPIO, BH1750 addr, ADS1115 addr, DS18B20 enable.
@@ -111,9 +105,8 @@ as a reference before the upcoming redesign.
 - Fan automation (single fan): RH high/low + min off + max on + night + periodic.
 
 ## Notifications (Current)
-- Telegram and Email supported (enable/disable, severity level, cooldown).
-- Status checks for Telegram/Email readiness.
-- Test send endpoint: `/api/notifications/test`.
+Not implemented in the current (main) codebase.
+Planned in `sera_panel/reports/future-features.md` and `sera_panel/reports/panel-redesign-spec.md`.
 
 ## LCD (Current)
 - LCD status is part of `/api/status` and can be updated via `/api/lcd`.
@@ -134,10 +127,8 @@ as a reference before the upcoming redesign.
 - Weather cache files in `data/cache/weather/` (per-day JSON, used by reports).
 
 ## Config
-- `config/channels.json`: channels with role, GPIO, active_low, HA entity.
+- `config/channels.json`: channels with role, GPIO, active_low.
 - `config/sensors.json`: DHT22 GPIO, BH1750 addr, ADS1115 addr, DS18B20 enable, LCD settings.
-- `config/notifications.json`: notification settings.
-- `config/retention.json`: retention/cleanup settings.
 - `config/updates.json`: UI updates feed.
 - `config/reporting.json`: report thresholds + location (`SERA_LAT`, `SERA_LON`, `SERA_TZ`) for weather-based comparisons.
 
@@ -147,9 +138,8 @@ as a reference before the upcoming redesign.
 - Weather is cached on disk per day to reduce API calls and keep reports fast.
 
 ## Home Assistant Integration
-- Channels can be `backend: homeassistant` with `ha_entity_id`.
-- HA base URL + token via env vars.
-- Sync interval for HA state is configurable.
+Not implemented in the current (main) codebase.
+Planned in `sera_panel/reports/future-features.md` and `sera_panel/reports/panel-redesign-spec.md`.
 
 ## API (Selected)
 - `GET /api/status`: full status payload for UI.
@@ -159,19 +149,12 @@ as a reference before the upcoming redesign.
 - `POST /api/settings`: safe mode + limits + automation.
 - `GET /api/sensor_log`: log data and CSV export.
 - `GET /api/updates`: UI updates feed.
-- `POST /api/notifications/test`: notification test send.
-- `GET /api/backup` and `POST /api/backup/restore`: backup/restore.
-- `POST /api/retention/cleanup`: manual cleanup.
 - `POST /api/lcd`: LCD config + lines.
-- `POST /api/panel/restart`: restart panel service.
 
 ## Environment Variables (Selected)
 - `SIMULATION_MODE`, `DISABLE_BACKGROUND_LOOPS`, `ADMIN_TOKEN`.
-- `HA_BASE_URL`, `HA_TOKEN`, `HA_TIMEOUT_SECONDS`, `HA_SYNC_INTERVAL_SECONDS`.
-- `LIGHT_CHANNEL_NAME`, `FAN_CHANNEL_NAME`, `PUMP_CHANNEL_NAME`, `HEATER_CHANNEL_NAME`.
+- `LIGHT_CHANNEL_NAME`, `FAN_CHANNEL_NAME`, `PUMP_CHANNEL_NAME`.
 - `DHT22_GPIO`, `BH1750_ADDR`.
-- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
-- `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USER`, `EMAIL_SMTP_PASS`, `EMAIL_FROM`, `EMAIL_TO`, `EMAIL_SMTP_TLS`.
 
 ## Known Limitations (Current)
 - Single light/fan/heater/pump assumed in automation.
