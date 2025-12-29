@@ -1,5 +1,15 @@
 [
   {
+    "date": "2025-12-29",
+    "title": "Günlük ve haftalık raporlar eklendi",
+    "summary": "Sera verilerini anlaşılır özetler ve eğitici kartlarla görebileceğin yeni rapor sayfaları hazır.",
+    "details": [
+      "Günlük ve haftalık rapor sayfaları açıldı (grafikler + öğretici açıklamalar).",
+      "Lux/ısı/nem/VPD/yoğuşma/GDD metrikleri için TR açıklama sözlüğü var.",
+      "JSON ve CSV indirme uçlarıyla dışa aktarım yapılabilir."
+    ]
+  },
+  {
     "date": "2025-12-27",
     "title": "Kapat butonu gorunurlugu duzeltildi",
     "summary": "Kontrol ekraninda Kapat dugmesi net gorunur hale getirildi.",

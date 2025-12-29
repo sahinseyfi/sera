@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="hero p-3 rounded-4 mb-3">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+      <p class="text-secondary mb-1">Günlük Rapor</p>
+      <h2 class="mb-1">Tarih: {{ report.date }}</h2>
+      <div class="small text-secondary">Profil: {{ report.profile.label or report.profile.name }} · Zaman dilimi: {{ report.tz }}</div>
+    </div>
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="modeToggle" {% if report.config.BEGINNER_MODE_DEFAULT %}checked{% endif %}>
+        <label class="form-check-label" for="modeToggle">Acemi modu</label>
+      </div>
+      <a class="btn btn-outline-secondary btn-sm" href="/reports/weekly">Haftalık</a>
+      <a class="btn btn-outline-secondary btn-sm" href="/api/reports/daily.csv?date={{ report.date }}">CSV</a>
+    </div>
+  </div>
+  {% if report.weather.status != 'ok' %}
+    <div class="alert alert-warning mt-2 mb-0 py-2 px-3">
+      Dış veri alınamadı. Grafikler ve karşılaştırmalarda hava durumu boş olabilir.
+    </div>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-8">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Genel Bakış</h5>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          {% set badge_map = {'iyi':'success','orta':'warning','dikkat':'danger'} %}
+          <span class="badge text-bg-{{ badge_map.get(report.summary.badges.light, 'secondary') }}">Işık · {{ report.summary.badges.light|capitalize }}</span>
+          <span class="badge text-bg-{{ badge_map.get(report.summary.badges.heat, 'secondary') }}">Isı · {{ report.summary.badges.heat|capitalize }}</span>
+          <span class="badge text-bg-{{ badge_map.get(report.summary.badges.condensation, 'secondary') }}">Yoğuşma · {{ report.summary.badges.condensation|capitalize }}</span>
+        </div>
+        <div class="progress-wrap">
+          <div class="d-flex justify-content-between small">
+            <span>Sıcaklık hedef uyumu</span><span>{{ report.summary.progress.temp_ok_pct }}%</span>
+          </div>
+          <div class="progress mb-2" role="progressbar"><div class="progress-bar" style="width: {{ report.summary.progress.temp_ok_pct }}%"></div></div>
+          <div class="d-flex justify-content-between small">
+            <span>VPD hedef uyumu</span><span>{{ report.summary.progress.vpd_ok_pct }}%</span>
+          </div>
+          <div class="progress mb-2" role="progressbar"><div class="progress-bar bg-info" style="width: {{ report.summary.progress.vpd_ok_pct }}%"></div></div>
+          <div class="d-flex justify-content-between small">
+            <span>Işık hedefi</span><span>{{ report.summary.progress.light_ok_pct }}%</span>
+          </div>
+          <div class="progress mb-2" role="progressbar"><div class="progress-bar bg-success" style="width: {{ report.summary.progress.light_ok_pct }}%"></div></div>
+          <div class="d-flex justify-content-between small">
+            <span>Yoğuşma düşük risk</span><span>{{ report.summary.progress.dew_safe_pct }}%</span>
+          </div>
+          <div class="progress" role="progressbar"><div class="progress-bar bg-warning" style="width: {{ report.summary.progress.dew_safe_pct }}%"></div></div>
+        </div>
+        <div class="mt-3">
+          <h6 class="mb-1">Bugünün Hikâyesi</h6>
+          <ul class="mb-0 small">
+            {% for line in report.summary.story %}
+              <li>{{ line }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-2">Karşılaştırmalar</h6>
+        <div class="small text-secondary mb-2">Bugün vs Dün · Bugün vs Son 7 gün ort.</div>
+        <div class="comparison-grid">
+          {% set cmp = report.comparisons %}
+          <div class="cmp-row">
+            <span>Işık dozu (lux-saat)</span>
+            <span class="text-secondary">{{ cmp.vs_yesterday.light_dose_delta|round(2) }}</span>
+            <span class="text-secondary">{{ cmp.vs_last7_avg.light_dose_delta|round(2) }}</span>
+          </div>
+          <div class="cmp-row">
+            <span>En düşük sıcaklık</span>
+            <span class="text-secondary">{{ cmp.vs_yesterday.temp_min_delta }}</span>
+            <span class="text-secondary">{{ cmp.vs_last7_avg.temp_min_delta }}</span>
+          </div>
+          <div class="cmp-row">
+            <span>En yüksek sıcaklık</span>
+            <span class="text-secondary">{{ cmp.vs_yesterday.temp_max_delta }}</span>
+            <span class="text-secondary">{{ cmp.vs_last7_avg.temp_max_delta }}</span>
+          </div>
+          <div class="cmp-row">
+            <span>Yoğuşma riskli saat</span>
+            <span class="text-secondary">{{ cmp.vs_yesterday.dew_risk_hours_delta|round(2) }}</span>
+            <span class="text-secondary">{{ cmp.vs_last7_avg.dew_risk_hours_delta|round(2) }}</span>
+          </div>
+          <div class="cmp-row">
+            <span>Stres saatleri</span>
+            <span class="text-secondary">{{ cmp.vs_yesterday.stress_hours_delta|round(2) }}</span>
+            <span class="text-secondary">{{ cmp.vs_last7_avg.stress_hours_delta|round(2) }}</span>
+          </div>
+          <div class="cmp-row">
+            <span>GDD</span>
+            <span class="text-secondary">{{ cmp.vs_yesterday.gdd_delta|round(2) }}</span>
+            <span class="text-secondary">{{ cmp.vs_last7_avg.gdd_delta|round(2) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="card teach-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <h5 class="card-title mb-1">Işık</h5>
+          <span class="badge text-bg-secondary">{{ report.indoor.light.daylight_hours }} saat aydınlık</span>
+        </div>
+        <div class="teach-row">
+          <div class="teach-label">Ne oldu?</div>
+          <div>Min {{ report.indoor.light.min|default('—') }} · Max {{ report.indoor.light.max|default('—') }} lux ({{ report.indoor.light.max_time|default('—') }}) · Ortalama {{ report.indoor.light.avg|default('—') }} | Aydınlık eşiği {{ report.indoor.light.threshold|default('—') }} lux üstü {{ report.indoor.light.daylight_hours }} saat.</div>
+        </div>
+        <div class="teach-row">
+          <div class="teach-label">Bu ne demek?</div>
+          <div>
+            {% set light_status = report.summary.badges.light %}
+            {% if light_status == 'iyi' %} Gün boyu ışık seviyesi hedefi karşıladı.
+            {% elif light_status == 'orta' %} Işık kısmen yeterli; akşam veya bulutlu saatlerde düşüş var.
+            {% else %} Işık yetersiz görünüyor; sensör veya aydınlatma konumunu kontrol et.
+            {% endif %}
+          </div>
+        </div>
+        <div class="teach-row">
+          <div class="teach-label">Neyi izlemeliyim?</div>
+          <div>Gündoğumu/ günbatımı sonrası ilk ve son saatlerde lux trendini izle; bulutlulukla kopukluk varsa sensörü kontrol et.</div>
+        </div>
+        <div class="teach-row expert-only">
+          <div class="teach-label">Detay</div>
+          <div>Işık dozu (proxy): {{ report.indoor.light.light_dose_lux_hours }} lux-saat · Eşik: {{ report.indoor.light.threshold }} lux · Veri: BH1750, GTI karşılaştırmalı.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card teach-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <h5 class="card-title mb-1">Isı & Nem</h5>
+          <span class="badge text-bg-secondary">{{ report.indoor.temperature.ok_hours }} saat hedefte</span>
+        </div>
+        <div class="teach-row">
+          <div class="teach-label">Ne oldu?</div>
+          <div>Min {{ report.indoor.temperature.min|default('—') }}°C ({{ report.indoor.temperature.min_time|default('—') }}) · Max {{ report.indoor.temperature.max|default('—') }}°C ({{ report.indoor.temperature.max_time|default('—') }}) · Ortalama {{ report.indoor.temperature.avg|default('—') }}°C. Nem ortalaması {{ report.indoor.humidity.avg|default('—') }}%.</div>
+        </div>
+        <div class="teach-row">
+          <div class="teach-label">Bu ne demek?</div>
+          <div>
+            {% set heat_status = report.summary.badges.heat %}
+            {% if heat_status == 'iyi' %} Sıcaklık çoğunlukla hedef bandında.
+            {% elif heat_status == 'orta' %} Band dışı saatler var; gece-soğuk veya gündüz-sıcak kısa süreli olmuş.
+            {% else %} Hedef bandı dışında uzun süre kalmış; stres riskini kontrol et.
+            {% endif %}
+          </div>
+        </div>
+        <div class="teach-row">
+          <div class="teach-label">Neyi izlemeliyim?</div>
+          <div>Stres saatleri ({{ report.plants.stress_hours }} saat) ve sıcaklık sıçramaları ({{ report.data_quality.spike_count }}) artarsa sensör bağlantısını ve hava akışını kontrol et.</div>
+        </div>
+        <div class="teach-row expert-only">
+          <div class="teach-label">Detay</div>
+          <div>Hedef bandı: {{ report.thresholds.TEMP_OK_MIN }}–{{ report.thresholds.TEMP_OK_MAX }}°C · Stres eşikleri: {{ report.thresholds.TEMP_STRESS_COLD }} / {{ report.thresholds.TEMP_STRESS_HOT }}°C · ΔT spike eşiği: {{ report.thresholds.TEMP_SPIKE_DELTA }}°C.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="card teach-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <h5 class="card-title mb-1">VPD & Yoğuşma</h5>
+          <span class="badge text-bg-secondary">VPD hedef: {{ report.indoor.vpd.ok_hours }} saat</span>
+        </div>
+        <div class="teach-row">
+          <div class="teach-label">Ne oldu?</div>
+          <div>VPD min {{ report.indoor.vpd.min|default('—') }} kPa · max {{ report.indoor.vpd.max|default('—') }} kPa · ort {{ report.indoor.vpd.avg|default('—') }} kPa. Yoğuşma riskli süre: {{ report.indoor.dewpoint_margin.high_risk_hours }} saat (en düşük marj {{ report.indoor.dewpoint_margin.min|default('—') }}°C).</div>
+        </div>
+        <div class="teach-row">
+          <div class="teach-label">Bu ne demek?</div>
+          <div>
+            {% if report.indoor.dewpoint_margin.high_risk_hours > 0 %} Marj düşmüş; yüzeylerde nemlenme riski var.
+            {% else %} Marj güvenli; yoğuşma riski görülmedi.
+            {% endif %}
+          </div>
+        </div>
+        <div class="teach-row">
+          <div class="teach-label">Neyi izlemeliyim?</div>
+          <div>VPD hedef dışı saatler ve marj düşüşü aynı saatlere denk geliyorsa gece havalandırmasını gözle.</div>
+        </div>
+        <div class="teach-row expert-only">
+          <div class="teach-label">Detay</div>
+          <div>VPD hedef: {{ report.thresholds.VPD_OK_MIN }}–{{ report.thresholds.VPD_OK_MAX }} kPa · Yoğuşma eşikleri: {{ report.thresholds.DEWPOINT_MARGIN_HIGH_RISK_C }} / {{ report.thresholds.DEWPOINT_MARGIN_MED_RISK_C }}°C.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card teach-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <h5 class="card-title mb-1">Bitki Metrikleri</h5>
+          <span class="badge text-bg-secondary">Profil: {{ report.profile.label }}</span>
+        </div>
+        <div class="teach-row">
+          <div class="teach-label">Ne oldu?</div>
+          <div>GDD: {{ report.plants.gdd }} · Stres saatleri: {{ report.plants.stress_hours }} · VPD hedef: {{ report.indoor.vpd.ok_hours }} saat.</div>
+        </div>
+        <div class="teach-row">
+          <div class="teach-label">Bu ne demek?</div>
+          <div>
+            {% if report.plants.gdd > 0 %} Gün, gelişim için sıcaklık sağladı (GDD pozitif).
+            {% else %} GDD sıfır; ortam taban sıcaklığın altında kalmış.
+            {% endif %}
+          </div>
+        </div>
+        <div class="teach-row">
+          <div class="teach-label">Neyi izlemeliyim?</div>
+          <div>GDD ve stres saatlerini haftalık toplamda takip et; profil eşiklerine göre hedefi ayarla.</div>
+        </div>
+        <div class="teach-row expert-only">
+          <div class="teach-label">Detay</div>
+          <div>GDD formülü: max(0, ((Tmax+Tmin)/2) - {{ report.thresholds.GDD_BASE_C }}) · Profil açıklaması: {{ report.profile.description }}.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <h5 class="card-title mb-1">Grafikler</h5>
+          <div class="small text-secondary">Gündoğumu/günbatımı ve eşik anotasyonlu</div>
+        </div>
+        <div class="chart-grid">
+          <div>
+            <canvas id="lightChart" height="210"></canvas>
+            <div class="small text-secondary mt-1">Lux & dış ışınım</div>
+          </div>
+          <div>
+            <canvas id="tempChart" height="210"></canvas>
+            <div class="small text-secondary mt-1">Sıcaklık, dew point, delta</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="card-title mb-2">Dış Koşullar</h6>
+        <div class="small">Konum: {{ report.config.SERA_LAT }}, {{ report.config.SERA_LON }}</div>
+        <div class="small">Gündoğumu: {{ report.weather.sunrise or '—' }} · Günbatımı: {{ report.weather.sunset or '—' }}</div>
+        <div class="small">Cephe: {{ report.config.orientation.SERA_FACADE_AZIMUTH_NORTH_DEG }}° kuzeyden · Open-Meteo azimuth: {{ report.config.orientation.azimuth_open_meteo }}°</div>
+        <div class="mt-2">
+          <div class="badge-soft">GTI & bulutluluk grafikte</div>
+        </div>
+        <div class="mt-3">
+          <h6 class="mb-1">Veri Kalitesi</h6>
+          <div class="small">Kapsam: {{ report.coverage.seconds|int }} sn · {{ report.coverage.note or 'Tam' }}</div>
+          <div class="small">Sıcaklık spike sayısı: {{ report.data_quality.spike_count }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h6 class="card-title mb-2">Bugün ne öğrendik?</h6>
+    <div class="small text-secondary mb-2">Sadece gözlem; otomasyon önerisi yok.</div>
+    <ul class="mb-0">
+      <li>Işık dozu proxy: {{ report.indoor.light.light_dose_lux_hours }} lux-saat. {% if report.summary.badges.light == 'dikkat' %}Aydınlatma süresi veya sensör konumunu gözden geçir.{% else %}Trendler normal.{% endif %}</li>
+      <li>GDD: {{ report.plants.gdd }} · Stres saatleri: {{ report.plants.stress_hours }}.</li>
+      <li>Yoğuşma riskli saat: {{ report.indoor.dewpoint_margin.high_risk_hours }} · En düşük marj: {{ report.indoor.dewpoint_margin.min|default('—') }}°C.</li>
+    </ul>
+  </div>
+</div>
+
+<style>
+  .progress-wrap .progress { height: 10px; background: #e2e8f0; }
+  .comparison-grid { display: grid; grid-template-columns: 1fr 80px 80px; gap: 6px 10px; }
+  .comparison-grid .cmp-row { display: contents; }
+  .teach-card .teach-row { display: grid; grid-template-columns: 120px 1fr; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .teach-card .teach-row:last-child { border-bottom: none; }
+  .teach-label { font-weight: 600; color: var(--muted); }
+  .badge-soft { background: rgba(14,165,164,0.12); border: 1px solid rgba(14,165,164,0.35); color: var(--text-strong); padding: 4px 8px; border-radius: 12px; }
+  .chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+  .expert-only { display: none; }
+  body.expert-mode .expert-only { display: block; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='reports.js') }}"></script>
+<script>
+  window.reportData = {{ report|tojson }};
+  window.initDailyReport && window.initDailyReport();
+</script>
+{% endblock %}

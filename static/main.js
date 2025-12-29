@@ -1,6 +1,7 @@
 const state = {
   status: null,
   poller: null,
+  lcdActiveInput: null,
   history: {
     metric: 'dht_temp',
     range: '24h',
@@ -1688,6 +1689,131 @@ function renderLcdPreview(lines) {
   wrap.innerHTML = safeLines.map(line => `<div class="lcd-preview-line">${line ?? ''}</div>`).join('');
 }
 
+function lcdTokenValues() {
+  const status = state.status || {};
+  const readings = status.sensor_readings || {};
+  const dht = readings.dht22 || {};
+  const ds = readings.ds18b20 || {};
+  const lux = readings.bh1750 || {};
+  const soil = readings.soil || {};
+  const automation = status.automation || {};
+  const calibration = automation.soil_calibration || {};
+  const soilCal = calibration.ch0 || calibration['ch0'] || {};
+  const fmtFloat = (value, fallback) => {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n.toFixed(1);
+    return fallback;
+  };
+  const fmtInt = (value, fallback) => {
+    const n = Number(value);
+    if (Number.isFinite(n)) return Math.round(n).toString();
+    return fallback;
+  };
+  const soilRaw = soil.ch0;
+  const dry = Number(soilCal.dry);
+  const wet = Number(soilCal.wet);
+  const raw = Number(soilRaw);
+  let soilPct = null;
+  if (Number.isFinite(dry) && Number.isFinite(wet) && dry !== wet && Number.isFinite(raw)) {
+    soilPct = Math.round((dry - raw) / (dry - wet) * 100);
+    soilPct = Math.min(100, Math.max(0, soilPct));
+  }
+  const now = new Date();
+  return {
+    temp: fmtFloat(dht.temperature, '--.-'),
+    hum: fmtInt(dht.humidity, '--'),
+    lux: fmtInt(lux.lux, '----'),
+    soil_pct: soilPct == null ? '--' : soilPct.toString(),
+    soil_raw: fmtInt(soilRaw, '----'),
+    ds_temp: fmtFloat(ds.temperature, '--.-'),
+    safe: status.safe_mode ? 'SAFE' : 'AKTIF',
+    time: now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
+function applyLcdTemplateLine(line) {
+  const ctx = lcdTokenValues();
+  return (line || '').replace(/\{\s*([a-zA-Z0-9_]+)\s*\}/g, (_, key) => ctx[key.toLowerCase()] ?? '');
+}
+
+function lcdLinesFromInputs() {
+  const lines = [];
+  for (let i = 0; i < 4; i += 1) {
+    const el = document.getElementById(`lcdLine${i}`);
+    lines.push(el ? el.value : '');
+  }
+  return lines;
+}
+
+function updateLcdCounters(rawLines, resolvedLines) {
+  const maxCols = Number(document.getElementById('lcdCols')?.value || 20);
+  for (let i = 0; i < 4; i += 1) {
+    const counter = document.getElementById(`lcdCount${i}`);
+    if (!counter) continue;
+    const rawLen = (rawLines[i] || '').length;
+    const resolvedLen = (resolvedLines[i] || '').length;
+    counter.textContent = `Şablon: ${rawLen} | Örnek: ${resolvedLen}/${maxCols}`;
+  }
+}
+
+function refreshLcdPreviewFromInputs() {
+  const modeEl = document.getElementById('lcdMode');
+  const mode = modeEl ? modeEl.value : 'auto';
+  const rawLines = lcdLinesFromInputs();
+  let previewLines = rawLines;
+  if (mode === 'template') {
+    previewLines = rawLines.map(applyLcdTemplateLine);
+  } else if (mode === 'auto') {
+    previewLines = (state.status && state.status.lcd && state.status.lcd.lines) ? state.status.lcd.lines : previewLines;
+  }
+  renderLcdPreview(previewLines);
+  updateLcdCounters(rawLines, previewLines);
+}
+
+function bindLcdInputs() {
+  const inputs = document.querySelectorAll('.lcd-line');
+  inputs.forEach((input) => {
+    input.addEventListener('focus', () => { state.lcdActiveInput = input; });
+    input.addEventListener('input', refreshLcdPreviewFromInputs);
+  });
+}
+
+function fillLcdTemplatePreset() {
+  const mode = document.getElementById('lcdMode');
+  if (mode) mode.value = 'template';
+  const defaults = [
+    'Sic:{temp}C Nem:{hum}%',
+    'Isik:{lux}lx Top:{soil_pct}%',
+    'DS:{ds_temp}C Ham:{soil_raw}',
+    'Durum:{safe} Saat:{time}',
+  ];
+  defaults.forEach((val, idx) => {
+    const el = document.getElementById(`lcdLine${idx}`);
+    if (el) el.value = val;
+  });
+  refreshLcdPreviewFromInputs();
+}
+
+function clearLcdLines() {
+  for (let i = 0; i < 4; i += 1) {
+    const el = document.getElementById(`lcdLine${i}`);
+    if (el) el.value = '';
+  }
+  refreshLcdPreviewFromInputs();
+}
+
+function insertLcdToken(token) {
+  const target = state.lcdActiveInput || document.getElementById('lcdLine0');
+  if (!target) return;
+  const start = target.selectionStart ?? target.value.length;
+  const end = target.selectionEnd ?? target.value.length;
+  target.value = `${target.value.slice(0, start)}${token}${target.value.slice(end)}`;
+  target.focus();
+  const pos = start + token.length;
+  target.setSelectionRange(pos, pos);
+  refreshLcdPreviewFromInputs();
+}
+
 window.initLcd = function() {
   poll();
   if (state.poller) clearInterval(state.poller);
@@ -1696,12 +1822,30 @@ window.initLcd = function() {
   const saveBtn = document.getElementById('lcdSave');
   if (refreshBtn) refreshBtn.onclick = () => fetchLcdConfig();
   if (saveBtn) saveBtn.onclick = saveLcd;
+  const templateBtn = document.getElementById('lcdTemplatePreset');
+  if (templateBtn) templateBtn.onclick = fillLcdTemplatePreset;
+  const clearBtn = document.getElementById('lcdClearLines');
+  if (clearBtn) clearBtn.onclick = clearLcdLines;
+  const tokenButtons = document.querySelectorAll('[data-lcd-token]');
+  tokenButtons.forEach((btn) => {
+    btn.addEventListener('click', () => insertLcdToken(btn.dataset.lcdToken));
+  });
+  const mode = document.getElementById('lcdMode');
+  if (mode) mode.addEventListener('change', refreshLcdPreviewFromInputs);
+  const cols = document.getElementById('lcdCols');
+  if (cols) cols.addEventListener('input', refreshLcdPreviewFromInputs);
+  bindLcdInputs();
   fetchLcdConfig();
 };
 
 window.renderLcd = function(data) {
   const lcd = data.lcd || {};
-  renderLcdPreview(lcd.lines || []);
+  state.lastLcdStatus = lcd;
+  if (document.getElementById('lcdPreview')) {
+    refreshLcdPreviewFromInputs();
+  } else {
+    renderLcdPreview(lcd.lines || []);
+  }
 };
 
 function fetchLcdConfig() {
@@ -1735,7 +1879,7 @@ function fetchLcdConfig() {
       if (l1) l1.value = lines[1] || '';
       if (l2) l2.value = lines[2] || '';
       if (l3) l3.value = lines[3] || '';
-      renderLcdPreview(lcd.lines || lines);
+      refreshLcdPreviewFromInputs();
     })
     .catch(() => {});
 }

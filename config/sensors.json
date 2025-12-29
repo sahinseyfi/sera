@@ -10,11 +10,11 @@
   "lcd_rows": 4,
   "lcd_expander": "PCF8574",
   "lcd_charmap": "A00",
-  "lcd_mode": "manual",
+  "lcd_mode": "template",
   "lcd_lines": [
-    "SATIR 1",
-    "SATIR 2",
-    "SATIR 3",
-    "SATIR 4"
+    "Sic:{temp}C Nem:{hum}%",
+    "Isik:{lux} lx Top:{soil_pct}%",
+    "DS:{ds_temp}C Ham:{soil_raw}",
+    "Durum:{safe} Saat:{time}"
   ]
 }

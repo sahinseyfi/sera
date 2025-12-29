@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="hero p-3 rounded-4 mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <p class="text-secondary mb-1">Panel Notları</p>
+      <h2 class="mb-0">İyileştirme Önerileri</h2>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for group in notes %}
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <h5 class="card-title mb-0">{{ group.title }}</h5>
+          <span class="pill small">{{ group.summary }}</span>
+        </div>
+        <ul class="mb-0 small text-secondary">
+          {% for item in group.items_list %}
+          <li class="mb-1">{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

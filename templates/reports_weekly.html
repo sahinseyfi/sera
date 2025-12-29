@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="hero p-3 rounded-4 mb-3">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+      <p class="text-secondary mb-1">Haftalık Rapor</p>
+      <h2 class="mb-1">Tarih aralığı: {{ report.start_date }} → {{ report.end_date }}</h2>
+      <div class="small text-secondary">Profil: {{ profile or report.config.ACTIVE_PROFILE }} · Acemi varsayılan: {{ report.config.BEGINNER_MODE_DEFAULT }}</div>
+    </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <div class="form-check form-switch me-2">
+        <input class="form-check-input" type="checkbox" role="switch" id="modeToggle" {% if report.config.BEGINNER_MODE_DEFAULT %}checked{% endif %}>
+        <label class="form-check-label" for="modeToggle">Acemi modu</label>
+      </div>
+      <a class="btn btn-outline-secondary btn-sm" href="/reports/daily">Günlük</a>
+      <a class="btn btn-outline-secondary btn-sm" href="/api/reports/weekly.csv?end={{ report.end_date }}">CSV</a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="card-title mb-1">Işık</h6>
+      <div class="display-6">{{ report.summary.light_dose_lux_hours }}</div>
+      <div class="small text-secondary">Toplam lux-saat (proxy)</div>
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="card-title mb-1">Stres Saatleri</h6>
+      <div class="display-6">{{ report.summary.stress_hours }}</div>
+      <div class="small text-secondary">Sıcaklık stres toplamı</div>
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="card-title mb-1">GDD Toplamı</h6>
+      <div class="display-6">{{ report.summary.gdd_total }}</div>
+      <div class="small text-secondary">Gelişim puanı</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <h5 class="card-title mb-1">Haftalık Trend</h5>
+      <div class="small text-secondary">Işık, stres ve GDD dağılımı</div>
+    </div>
+    <canvas id="weeklyChart" height="240"></canvas>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h6 class="card-title mb-2">Gün Bazında Özet</h6>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>Tarih</th>
+            <th>Işık dozu</th>
+            <th>Min / Max sıcaklık</th>
+            <th>Yoğuşma riskli saat</th>
+            <th>Stres saatleri</th>
+            <th>GDD</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for day in report.days %}
+          <tr>
+            <td>{{ day.date }}</td>
+            <td>{{ day.indoor.light.light_dose_lux_hours }}</td>
+            <td>{{ day.indoor.temperature.min }} / {{ day.indoor.temperature.max }}</td>
+            <td>{{ day.indoor.dewpoint_margin.high_risk_hours }}</td>
+            <td>{{ day.plants.stress_hours }}</td>
+            <td>{{ day.plants.gdd }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .display-6 { font-size: 2.2rem; }
+  .expert-only { display: none; }
+  body.expert-mode .expert-only { display: block; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{{ url_for('static', filename='reports.js') }}"></script>
+<script>
+  window.reportData = {{ report|tojson }};
+  window.initWeeklyReport && window.initWeeklyReport();
+</script>
+{% endblock %}

@@ -1,36 +1,43 @@
-# Repository Guidelines
+# Repository Guidelines — AKILLI SERA (Momo & Nova Station)
 
-## Project Structure & Module Organization
-- Root directory contains standalone Python scripts for sensor and relay experiments (e.g., `sensors_test.py`, `moisture_log.py`, `lcd_test.py`).
-- `sera_panel/` holds the main control panel app (`app.py`), hardware test scripts (`*.sh`), and runtime configuration (`config.json`).
-- `sera_projesi/` contains an alternate or earlier application entry point (`app.py`).
-- `sera-venv/` is a local Python virtual environment; keep project dependencies installed there.
+Bu repo Raspberry Pi üzerinde çalışan bir sera kontrol panelidir. Kod, fiziksel donanımı (röle/pompa/ısıtıcı/fan) kontrol edebildiği için öncelik her zaman **güvenlik**tir.
 
-## Build, Test, and Development Commands
-- `python3 sera_panel/app.py` runs the primary panel application.
-- `python3 sera_projesi/app.py` runs the alternate application entry point.
-- `python3 sensors_test.py` or `python3 dht_test.py` runs individual hardware test scripts.
-- `bash sera_panel/relay_click_test.sh` runs relay click tests; check `.log` files in `sera_panel/` for output.
+## Hızlı Başlangıç (geliştirme)
+- Sanal ortam: `python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt`
+  - Not: Repoda `venv/` veya `sera-venv/` görülebilir; **tek bir venv** seçip onu kullanmak en temizi.
+- Panel (donanım yokken): `SIMULATION_MODE=1 python3 app.py`
+- Panel (gerçek donanım): `python3 app.py` (LAN: `http://<pi-ip>:5000`)
+- Alternatif launcher: `python3 sera_panel/app.py` (aynı uygulamayı `0.0.0.0:5000` ile başlatır)
+- Otomatik test: `SIMULATION_MODE=1 DISABLE_BACKGROUND_LOOPS=1 pytest -q`
 
-## Coding Style & Naming Conventions
-- Use 4-space indentation and PEP 8-style Python formatting.
-- Prefer `snake_case` for functions/variables and `UPPER_SNAKE_CASE` for constants.
-- Keep module filenames descriptive and in `snake_case` (e.g., `moisture_raw.py`).
-- Store runtime settings in `sera_panel/config.json` rather than hard-coding values.
+## Proje Yapısı (nerede ne var?)
+- `app.py`: Ana Flask uygulaması (API + otomasyon + GPIO katmanı)
+- `templates/`, `static/`: Arayüz dosyaları
+- `config/`: Çalışma zamanı ayarları
+  - `config/channels.json`: Kanal ↔ GPIO eşlemesi (active-low/active-high)
+  - `config/sensors.json`: Sensör/LCD ayarları (I2C adresleri dahil)
+  - `config/reporting.json`: Raporlama/bitki profil eşikleri
+  - `config/updates.json`: Panelde görünen “Güncellemeler” listesi
+- `data/`: Üretilen veriler (SQLite + CSV loglar); git’e dahil edilmez
+- `sera_panel/`: Launcher + eski dosyalar + röle test scriptleri (`relay_*.sh`)
+- `sera_projesi/`: Eski/alternatif giriş noktası
+- Kök `*_test.py` dosyaları: Donanım denemeleri (tekil scriptler)
+- `tests/`: `pytest` ile çalışan temel otomatik testler (SIMULATION_MODE ile)
 
-## Testing Guidelines
-- Tests are hardware-driven scripts named `*_test.py` and `*_test.sh`.
-- Run tests manually with the target hardware connected; there is no automated test runner configured.
-- Add new tests following the existing naming pattern and keep logs in `sera_panel/` when appropriate.
+## Güvenlik (donanım)
+- Varsayılan hedef: tüm aktüatörler OFF; pompa/ısıtıcı sadece süre-limitli.
+- Röle/pompa/ısıtıcıyla ilgili değişikliklerde önce `SIMULATION_MODE=1` ile doğrula.
+- Donanım testleri için `sera_panel/AGENTS.md` içindeki checklist ve kuralları takip et.
 
-## Update Log Guidelines
-- When pushing to GitHub, also add a user-friendly entry to `config/updates.json`.
-- Each entry should explain what changed and why it matters for the user (not technical details).
+## Konfigürasyon & Secrets
+- Mapping/sensör ayarlarını `config/*.json` içinde tut; koda sabitleme yapma.
+- `ADMIN_TOKEN` gibi değerleri env var olarak kullan; repoya secret ekleme.
+- Donanım davranışı değişiyorsa (GPIO/I2C/pin): kod/README içinde net belirt.
 
-## Commit & Pull Request Guidelines
-- No Git history is present in this workspace; use clear, imperative commit messages (e.g., "Add relay polarity check").
-- PRs should include a short description, how you validated (commands run), and any hardware assumptions.
+## Güncelleme Notu (UI)
+- GitHub’a push ettiğinde kullanıcıya görünür bir not eklemek için `config/updates.json`’a yeni bir kayıt gir.
+- Kayıtlar teknik detay değil, “ne değişti + kullanıcıya faydası” odaklı olmalı.
 
-## Security & Configuration Tips
-- Avoid committing secrets or network credentials; keep sensitive values out of `config.json`.
-- Be explicit about GPIO/I2C pin usage in code comments when altering hardware behavior.
+## Commit & PR
+- Commit mesajları: kısa, emir kipinde (örn. “Add relay polarity check”).
+- PR açıklaması: ne değişti + nasıl doğruladın (komutlar) + donanım varsayımları.

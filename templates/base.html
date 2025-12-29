@@ -79,6 +79,16 @@
       border: 1px solid rgba(14, 165, 164, 0.35);
       background: rgba(14, 165, 164, 0.08);
     }
+    @media (max-width: 768px) {
+      body { padding: 0 6px; }
+      .navbar .d-flex.flex-column.align-items-end { align-items: flex-start !important; }
+      .hero { padding: 1rem; }
+      .hero .d-flex { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+      .card { border-radius: 14px; }
+      .btn { font-size: 14px; }
+      #lcdTokenButtons button { flex: 1 1 45%; }
+      .lcd-preview { font-size: 14px; }
+    }
   </style>
 </head>
 <body>
@@ -94,9 +104,11 @@
           <li class="nav-item"><a class="nav-link" href="/control">Kontrol</a></li>
           <li class="nav-item"><a class="nav-link" href="/settings">Ayarlar</a></li>
           <li class="nav-item"><a class="nav-link" href="/logs">Loglar</a></li>
+          <li class="nav-item"><a class="nav-link" href="/reports/daily">Raporlar</a></li>
           <li class="nav-item"><a class="nav-link" href="/updates">Güncellemeler</a></li>
           <li class="nav-item"><a class="nav-link" href="/hardware">Donanım</a></li>
           <li class="nav-item"><a class="nav-link" href="/lcd">LCD</a></li>
+          <li class="nav-item"><a class="nav-link" href="/notes">Notlar</a></li>
           <li class="nav-item"><a class="nav-link" href="/help">Yardım / SSS</a></li>
         </ul>
         <div class="d-flex flex-column align-items-end gap-1">

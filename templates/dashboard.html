@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="hero p-3 rounded-4 mb-3">
-  <div class="d-flex justify-content-between align-items-center">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
       <p class="text-secondary mb-1">MVP-1 İzleme</p>
       <h2 class="mb-0">Anlık Sensör Değerleri</h2>
@@ -13,7 +13,7 @@
 </div>
 
 <div class="card mb-3"><div class="card-body">
-  <div class="d-flex justify-content-between align-items-center gap-2">
+  <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
     <div>
       <h6 class="mb-1">Bu sayfa ne işe yarar?</h6>
       <div class="small text-secondary">
@@ -211,7 +211,7 @@
 </div>
 
 <div class="card mt-3"><div class="card-body">
-  <div class="d-flex justify-content-between align-items-center">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <h6 class="card-title mb-0">Olay Günlüğü</h6>
     <small class="text-secondary" id="eventLogUpdated">--</small>
   </div>
@@ -221,6 +221,9 @@
   .history-chart-wrap {
     position: relative;
     height: 320px;
+  }
+  @media (max-width: 768px) {
+    .history-chart-wrap { height: 240px; }
   }
   .history-chart-wrap canvas {
     width: 100%;

@@ -4,16 +4,24 @@ import io
 import json
 import os
 import random
+import re
 import sqlite3
 import subprocess
 import threading
 import time
 from collections import deque
-from datetime import datetime, timedelta, time as dt_time, timezone
+from datetime import date, datetime, timedelta, time as dt_time, timezone
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
 from flask import Flask, Response, jsonify, redirect, render_template, request, url_for
+from reporting import (
+    build_daily_report,
+    build_weekly_report,
+    explainers_catalog,
+    load_reporting_config,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_DIR = BASE_DIR / "config"
@@ -661,10 +669,21 @@ class LCDManager:
         with self.lock:
             if not bool(self.config.get("lcd_enabled", True)):
                 return
-            if self.config.get("lcd_mode", "auto") != "auto":
+            mode = str(self.config.get("lcd_mode", "auto"))
+            if mode == "auto":
+                lines = self._build_auto_lines(data)
+            elif mode == "template":
+                lines = self._build_template_lines(data)
+            else:
                 return
-            lines = self._build_auto_lines(data)
             self._write_lines(lines)
+
+    def set_template_lines(self, lines: List[str], data: Dict[str, Any]) -> None:
+        with self.lock:
+            self.config["lcd_mode"] = "template"
+            self.config["lcd_lines"] = list(lines)
+            templated = self._build_template_lines(data, lines)
+            self._write_lines(templated)
 
     def _write_lines(self, lines: List[str]) -> None:
         formatted = self._format_lines(lines)
@@ -708,19 +727,81 @@ class LCDManager:
         hum = fmt_float(dht.get("humidity"), 3, 0) or "--"
         line0 = f"Sic:{temp}C Nem:{hum}%"
 
-        lux_val = fmt_int(lux.get("lux"), 4) or "----"
+        lux_val = (fmt_int(lux.get("lux"), 4) or "----").strip()
         soil_raw = soil.get("ch0")
         soil_pct = self._soil_percent("ch0", soil_raw)
-        soil_pct_str = f"{soil_pct:3d}" if soil_pct is not None else "--"
+        soil_pct_str = (f"{soil_pct:3d}".strip()) if soil_pct is not None else "--"
         line1 = f"Isik:{lux_val}lx Top:{soil_pct_str}%"
 
         ds_temp = fmt_float((readings.get("ds18b20") or {}).get("temperature"), 4, 1) or "--.-"
-        soil_raw_str = fmt_int(soil_raw, 4) or "----"
+        soil_raw_str = (fmt_int(soil_raw, 4) or "----").strip()
         line2 = f"DS:{ds_temp}C Ham:{soil_raw_str}"
 
         safe_mode = bool(data.get("safe_mode"))
         line3 = "SAFE MODE" if safe_mode else "Sistem: AKTIF"
         return [line0, line1, line2, line3]
+
+    def _build_template_lines(self, data: Dict[str, Any], override_lines: Optional[List[str]] = None) -> List[str]:
+        template_lines: List[str] = []
+        raw_lines = override_lines if override_lines is not None else self.config.get("lcd_lines", ["", "", "", ""])
+        context = self._template_context(data)
+        for line in raw_lines:
+            template_lines.append(self._apply_template(str(line or ""), context))
+        while len(template_lines) < int(self.config.get("lcd_rows", 4)):
+            template_lines.append("")
+        return template_lines
+
+    def _template_context(self, data: Dict[str, Any]) -> Dict[str, str]:
+        readings = data.get("sensor_readings", {})
+        dht = readings.get("dht22") or {}
+        ds = readings.get("ds18b20") or {}
+        lux = readings.get("bh1750") or {}
+        soil = readings.get("soil") or {}
+        actuators = data.get("actuator_state") or {}
+        safe_mode = bool(data.get("safe_mode"))
+
+        def fmt_float(value: Any, precision: int, fallback: str) -> str:
+            try:
+                return f"{float(value):.{precision}f}"
+            except (TypeError, ValueError):
+                return fallback
+
+        def fmt_int(value: Any, fallback: str) -> str:
+            try:
+                return str(int(value))
+            except (TypeError, ValueError):
+                return fallback
+
+        soil_raw = soil.get("ch0")
+        soil_pct_val = self._soil_percent("ch0", soil_raw)
+
+        def relay_label(key: str) -> str:
+            entry = actuators.get(key) or {}
+            on = bool(entry.get("state"))
+            label = (entry.get("description") or key).split(" ")[0].upper()
+            return f"{label}:{'ON' if on else 'OFF'}"
+
+        pump_key = next((k for k in actuators if "PUMP" in k), None)
+        heater_key = next((k for k in actuators if "HEATER" in k), None)
+        return {
+            "temp": fmt_float(dht.get("temperature"), 1, "--.-"),
+            "hum": fmt_int(dht.get("humidity"), "--"),
+            "lux": fmt_int(lux.get("lux"), "----"),
+            "soil_pct": fmt_int(soil_pct_val, "--"),
+            "soil_raw": fmt_int(soil_raw, "----"),
+            "ds_temp": fmt_float(ds.get("temperature"), 1, "--.-"),
+            "safe": "SAFE" if safe_mode else "AKTIF",
+            "time": datetime.now().strftime("%H:%M"),
+            "pump": relay_label(pump_key) if pump_key else "",
+            "heater": relay_label(heater_key) if heater_key else "",
+        }
+
+    def _apply_template(self, template: str, context: Dict[str, str]) -> str:
+        def repl(match: Any) -> str:
+            key = match.group(1).strip().lower()
+            return str(context.get(key, ""))
+
+        return re.sub(r"{\s*([a-zA-Z0-9_]+)\s*}", repl, template)
 
     def _soil_percent(self, channel: str, raw: Any) -> Optional[int]:
         if raw is None:
@@ -1925,6 +2006,20 @@ def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _parse_report_date(param: Optional[str], tz: ZoneInfo) -> Optional[date]:
+    if not param:
+        return None
+    try:
+        return datetime.strptime(param, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _default_report_date(cfg: Dict[str, Any]) -> date:
+    tz = ZoneInfo(cfg.get("SERA_TZ", "Europe/Istanbul"))
+    return datetime.now(tz).date()
+
+
 _sensor_alert_state: Dict[str, Dict[str, Any]] = {}
 _last_sensor_log_ts: float = 0.0
 _sensor_last_ok_ts: Dict[str, float] = {}
@@ -2407,6 +2502,42 @@ def updates_page() -> Any:
     return render_template("updates.html")
 
 
+@app.route("/reports/daily")
+def reports_daily_page() -> Any:
+    cfg = load_reporting_config()
+    tz = ZoneInfo(cfg.get("SERA_TZ", "Europe/Istanbul"))
+    date_raw = request.args.get("date")
+    profile = request.args.get("profile")
+    target_date = _parse_report_date(date_raw, tz)
+    if target_date is None:
+        target_date = _default_report_date(cfg)
+    report = build_daily_report(target_date, profile, cfg)
+    return render_template(
+        "reports_daily.html",
+        report=report,
+        target_date=target_date.isoformat(),
+        profile=profile or report.get("profile", {}).get("name"),
+    )
+
+
+@app.route("/reports/weekly")
+def reports_weekly_page() -> Any:
+    cfg = load_reporting_config()
+    tz = ZoneInfo(cfg.get("SERA_TZ", "Europe/Istanbul"))
+    end_raw = request.args.get("end")
+    profile = request.args.get("profile")
+    end_date = _parse_report_date(end_raw, tz)
+    if end_date is None:
+        end_date = _default_report_date(cfg)
+    report = build_weekly_report(end_date, profile, cfg)
+    return render_template(
+        "reports_weekly.html",
+        report=report,
+        end_date=end_date.isoformat(),
+        profile=profile or report.get("config", {}).get("ACTIVE_PROFILE"),
+    )
+
+
 def api_status_payload(readings: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     latest = sensor_manager.latest()
     if readings is None:
@@ -2727,6 +2858,144 @@ def api_events() -> Any:
     return jsonify({"events": events})
 
 
+def _csv_response(filename: str, headers_row: List[str], rows: List[List[Any]]) -> Response:
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(headers_row)
+    for row in rows:
+        writer.writerow(row)
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@app.route("/api/reports/daily")
+def api_reports_daily() -> Any:
+    cfg = load_reporting_config()
+    tz = ZoneInfo(cfg.get("SERA_TZ", "Europe/Istanbul"))
+    date_raw = request.args.get("date")
+    profile = request.args.get("profile")
+    target_date = _parse_report_date(date_raw, tz)
+    if date_raw and target_date is None:
+        return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+    if target_date is None:
+        target_date = _default_report_date(cfg)
+    report = build_daily_report(target_date, profile, cfg)
+    return jsonify(report)
+
+
+@app.route("/api/reports/daily.csv")
+def api_reports_daily_csv() -> Any:
+    cfg = load_reporting_config()
+    tz = ZoneInfo(cfg.get("SERA_TZ", "Europe/Istanbul"))
+    date_raw = request.args.get("date")
+    profile = request.args.get("profile")
+    target_date = _parse_report_date(date_raw, tz)
+    if date_raw and target_date is None:
+        return jsonify({"error": "date must be YYYY-MM-DD"}), 400
+    if target_date is None:
+        target_date = _default_report_date(cfg)
+    report = build_daily_report(target_date, profile, cfg)
+    headers_row = [
+        "time",
+        "lux",
+        "temp_in",
+        "hum_in",
+        "dew_point",
+        "dew_margin",
+        "vpd",
+        "temp_out",
+        "hum_out",
+        "shortwave",
+        "gti",
+        "cloud_cover",
+        "temp_delta",
+    ]
+    rows = []
+    for entry in report.get("hourly", []):
+        rows.append([
+            entry.get("time"),
+            entry.get("lux"),
+            entry.get("temp_in"),
+            entry.get("hum_in"),
+            entry.get("dew_point"),
+            entry.get("dew_margin"),
+            entry.get("vpd"),
+            entry.get("temp_out"),
+            entry.get("hum_out"),
+            entry.get("shortwave"),
+            entry.get("gti"),
+            entry.get("cloud_cover"),
+            entry.get("temp_delta"),
+        ])
+    return _csv_response(f"daily_report_{target_date.isoformat()}.csv", headers_row, rows)
+
+
+@app.route("/api/reports/weekly")
+def api_reports_weekly() -> Any:
+    cfg = load_reporting_config()
+    tz = ZoneInfo(cfg.get("SERA_TZ", "Europe/Istanbul"))
+    end_raw = request.args.get("end")
+    profile = request.args.get("profile")
+    end_date = _parse_report_date(end_raw, tz)
+    if end_raw and end_date is None:
+        return jsonify({"error": "end must be YYYY-MM-DD"}), 400
+    if end_date is None:
+        end_date = _default_report_date(cfg)
+    report = build_weekly_report(end_date, profile, cfg)
+    return jsonify(report)
+
+
+@app.route("/api/reports/weekly.csv")
+def api_reports_weekly_csv() -> Any:
+    cfg = load_reporting_config()
+    tz = ZoneInfo(cfg.get("SERA_TZ", "Europe/Istanbul"))
+    end_raw = request.args.get("end")
+    profile = request.args.get("profile")
+    end_date = _parse_report_date(end_raw, tz)
+    if end_raw and end_date is None:
+        return jsonify({"error": "end must be YYYY-MM-DD"}), 400
+    if end_date is None:
+        end_date = _default_report_date(cfg)
+    report = build_weekly_report(end_date, profile, cfg)
+    headers_row = [
+        "date",
+        "light_dose_lux_hours",
+        "daylight_hours",
+        "temp_min",
+        "temp_max",
+        "temp_ok_hours",
+        "vpd_ok_hours",
+        "dew_high_hours",
+        "stress_hours",
+        "gdd",
+        "coverage_note",
+    ]
+    rows: List[List[Any]] = []
+    for day in report.get("days", []):
+        rows.append([
+            day.get("date"),
+            day.get("indoor", {}).get("light", {}).get("light_dose_lux_hours"),
+            day.get("indoor", {}).get("light", {}).get("daylight_hours"),
+            day.get("indoor", {}).get("temperature", {}).get("min"),
+            day.get("indoor", {}).get("temperature", {}).get("max"),
+            day.get("indoor", {}).get("temperature", {}).get("ok_hours"),
+            day.get("indoor", {}).get("vpd", {}).get("ok_hours"),
+            day.get("indoor", {}).get("dewpoint_margin", {}).get("high_risk_hours"),
+            day.get("plants", {}).get("stress_hours"),
+            day.get("plants", {}).get("gdd"),
+            day.get("coverage", {}).get("note"),
+        ])
+    return _csv_response(f"weekly_report_{report.get('start_date')}_{report.get('end_date')}.csv", headers_row, rows)
+
+
+@app.route("/api/reports/explainers")
+def api_reports_explainers() -> Any:
+    return jsonify({"items": explainers_catalog()})
+
+
 @app.route("/api/actuator/<name>", methods=["POST"])
 def api_actuator(name: str) -> Any:
     admin_error = require_admin()
@@ -2854,13 +3123,58 @@ def api_lcd() -> Any:
             json.dump(sensors_config, f, indent=2)
         sensor_manager.reload_config(sensors_config)
         lcd_manager.update_config(sensors_config)
+    mode = str(sensors_config.get("lcd_mode", "auto"))
     if isinstance(lines, list):
-        lcd_manager.set_manual_lines([str(x) if x is not None else "" for x in lines])
-        sensors_config["lcd_mode"] = "manual"
-        sensors_config["lcd_lines"] = [str(x) if x is not None else "" for x in lines]
+        sanitized_lines = [str(x) if x is not None else "" for x in lines]
+        sensors_config["lcd_lines"] = sanitized_lines
+        if mode == "manual":
+            lcd_manager.set_manual_lines(sanitized_lines)
+        elif mode == "template":
+            latest = sensor_manager.latest()
+            data_for_template = api_status_payload(latest.get("readings", {}))
+            lcd_manager.set_template_lines(sanitized_lines, data_for_template)
         with SENSORS_CONFIG_PATH.open("w") as f:
             json.dump(sensors_config, f, indent=2)
     return jsonify({"ok": True, "lcd": lcd_manager.status()})
+
+
+@app.route("/notes")
+def notes_page() -> Any:
+    note_groups = [
+        {
+            "title": "Güvenlik",
+            "summary": "Erişim ve gizli anahtarlar",
+            "items_list": [
+                "ADMIN_TOKEN default olarak 'changeme' ile geliyor; güçlü bir değerle değiştir ve UI'dan girilebilmesi için ayar eklemeyi planla.",
+                "Servis şu anda Flask dev server ile çalışıyor; prod için gunicorn + reverse proxy (Nginx/Caddy) kullan, yalnızca yerel ağdan erişim varsa firewall kuralı ekle.",
+            ],
+        },
+        {
+            "title": "Dayanıklılık",
+            "summary": "Servis ve sensör sağlığı",
+            "items_list": [
+                "Tek process çalışıyor; gunicorn ile en az 2 worker + health check (systemd watchdog veya /health) ekle.",
+                "Sensör döngüsü hata aldığında sadece alert kaydı var; disk loguna detay yaz ve alert'i UI'da daha görünür göster.",
+            ],
+        },
+        {
+            "title": "Kullanılabilirlik",
+            "summary": "Kontrol ve otomasyon deneyimi",
+            "items_list": [
+                "Kontrol sayfası için 'son yapılan işlemler' kısa listesi (pompa/ışık ne zaman açıldı) ekle.",
+                "LCD şablonlarına tarih, veri yaşı {data_age} ve fan gibi ek röleler için token desteği eklenebilir.",
+            ],
+        },
+        {
+            "title": "Gözlemlenebilirlik",
+            "summary": "Log ve metrikler",
+            "items_list": [
+                "sensor_logs için basit bir log rotasyonu ekle (gün/hafta dosyaları) ve UI'da indirme filtrelerine 'bugün' kısayolu ekle.",
+                "Aktüatör state değişimlerini (kim, ne zaman, sebep) sqlite'a kaydet; böylece geçmiş kontrol edilebilir.",
+            ],
+        },
+    ]
+    return render_template("notes.html", notes=note_groups)
 
 
 # Templates for testing convenience

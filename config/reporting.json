@@ -1,0 +1,83 @@
+{
+  "SERA_LAT": 41.1877,
+  "SERA_LON": 28.7402,
+  "SERA_TZ": "Europe/Istanbul",
+  "SERA_FACADE_AZIMUTH_NORTH_DEG": 144,
+  "SERA_FACADE_TILT_DEG": 90,
+  "BEGINNER_MODE_DEFAULT": true,
+  "ACTIVE_PROFILE": "general",
+  "LUX_DAYLIGHT_THRESHOLD": 300,
+  "LIGHT_TARGET_HOURS": 12,
+  "TEMP_OK_MIN": 18,
+  "TEMP_OK_MAX": 26,
+  "TEMP_STRESS_COLD": 12,
+  "TEMP_STRESS_HOT": 32,
+  "TEMP_SPIKE_DELTA": 3.5,
+  "VPD_OK_MIN": 0.6,
+  "VPD_OK_MAX": 1.2,
+  "GDD_BASE_C": 10,
+  "DEWPOINT_MARGIN_HIGH_RISK_C": 1.5,
+  "DEWPOINT_MARGIN_MED_RISK_C": 3.0,
+  "PLANT_PROFILES": {
+    "general": {
+      "label": "Genel",
+      "description": "Genel sebze/yeşillik için dengeli aralıklar.",
+      "TEMP_OK_MIN": 18,
+      "TEMP_OK_MAX": 26,
+      "TEMP_STRESS_COLD": 12,
+      "TEMP_STRESS_HOT": 32,
+      "VPD_OK_MIN": 0.6,
+      "VPD_OK_MAX": 1.2,
+      "GDD_BASE_C": 10,
+      "LUX_DAYLIGHT_THRESHOLD": 300
+    },
+    "tomato": {
+      "label": "Domates",
+      "description": "Sıcağı seven, ışık ihtiyacı yüksek.",
+      "TEMP_OK_MIN": 18,
+      "TEMP_OK_MAX": 28,
+      "TEMP_STRESS_COLD": 10,
+      "TEMP_STRESS_HOT": 32,
+      "VPD_OK_MIN": 0.8,
+      "VPD_OK_MAX": 1.2,
+      "GDD_BASE_C": 10,
+      "LUX_DAYLIGHT_THRESHOLD": 320
+    },
+    "pepper": {
+      "label": "Biber",
+      "description": "Domates kadar sıcak, biraz daha kuru havayı sever.",
+      "TEMP_OK_MIN": 20,
+      "TEMP_OK_MAX": 30,
+      "TEMP_STRESS_COLD": 12,
+      "TEMP_STRESS_HOT": 34,
+      "VPD_OK_MIN": 0.9,
+      "VPD_OK_MAX": 1.3,
+      "GDD_BASE_C": 12,
+      "LUX_DAYLIGHT_THRESHOLD": 320
+    },
+    "lettuce": {
+      "label": "Marul",
+      "description": "Serinlik ve düşük VPD ister, çiçeklenmeye karşı hassas.",
+      "TEMP_OK_MIN": 15,
+      "TEMP_OK_MAX": 24,
+      "TEMP_STRESS_COLD": 8,
+      "TEMP_STRESS_HOT": 28,
+      "VPD_OK_MIN": 0.5,
+      "VPD_OK_MAX": 1.0,
+      "GDD_BASE_C": 5,
+      "LUX_DAYLIGHT_THRESHOLD": 250
+    },
+    "basil": {
+      "label": "Fesleğen",
+      "description": "Ilık ve nemli ortamı sever, soğuğa hassastır.",
+      "TEMP_OK_MIN": 18,
+      "TEMP_OK_MAX": 30,
+      "TEMP_STRESS_COLD": 12,
+      "TEMP_STRESS_HOT": 34,
+      "VPD_OK_MIN": 0.8,
+      "VPD_OK_MAX": 1.2,
+      "GDD_BASE_C": 10,
+      "LUX_DAYLIGHT_THRESHOLD": 300
+    }
+  }
+}

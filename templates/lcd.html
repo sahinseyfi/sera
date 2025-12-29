@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="hero p-3 rounded-4 mb-3">
-  <div class="d-flex justify-content-between align-items-center">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
       <p class="text-secondary mb-1">I2C LCD</p>
       <h2 class="mb-0">LCD Kontrol ve Önizleme</h2>
@@ -21,6 +21,7 @@
 </div></div>
 
 <div class="card mb-3"><div class="card-body">
+  <h6 class="mb-2">LCD Ayarları</h6>
   <div class="row g-2">
     <div class="col-md-3">
       <label class="form-label">LCD Aktif</label>
@@ -33,6 +34,7 @@
       <label class="form-label">Mod</label>
       <select class="form-select" id="lcdMode">
         <option value="auto">Otomatik</option>
+        <option value="template">Şablon (sensör değerleri)</option>
         <option value="manual">Manuel</option>
       </select>
     </div>
@@ -66,25 +68,67 @@
 </div></div>
 
 <div class="card mb-3"><div class="card-body">
-  <h6 class="mb-2">Manuel Satırlar</h6>
-  <div class="row g-2">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+      <h6 class="mb-1">Satırlar (4x20)</h6>
+      <div class="small text-secondary">Şablon modunda {token} kullanarak sensör değerlerini otomatik yazdırabilirsin.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" id="lcdClearLines">Temizle</button>
+      <button class="btn btn-outline-primary btn-sm" id="lcdTemplatePreset">Örnek şablon</button>
+    </div>
+  </div>
+  <div class="row g-3">
     <div class="col-md-6">
-      <input class="form-control" id="lcdLine0" maxlength="20" placeholder="Satır 1">
+      <label class="form-label d-flex justify-content-between align-items-center">
+        <span>Satır 1</span>
+        <small class="text-secondary" id="lcdCount0">0/20</small>
+      </label>
+      <input class="form-control lcd-line" id="lcdLine0" data-idx="0" maxlength="64" placeholder="Sic:{temp}C Nem:{hum}%">
     </div>
     <div class="col-md-6">
-      <input class="form-control" id="lcdLine1" maxlength="20" placeholder="Satır 2">
+      <label class="form-label d-flex justify-content-between align-items-center">
+        <span>Satır 2</span>
+        <small class="text-secondary" id="lcdCount1">0/20</small>
+      </label>
+      <input class="form-control lcd-line" id="lcdLine1" data-idx="1" maxlength="64" placeholder="Isik:{lux}lx Top:{soil_pct}%">
     </div>
     <div class="col-md-6">
-      <input class="form-control" id="lcdLine2" maxlength="20" placeholder="Satır 3">
+      <label class="form-label d-flex justify-content-between align-items-center">
+        <span>Satır 3</span>
+        <small class="text-secondary" id="lcdCount2">0/20</small>
+      </label>
+      <input class="form-control lcd-line" id="lcdLine2" data-idx="2" maxlength="64" placeholder="DS:{ds_temp}C Ham:{soil_raw}">
     </div>
     <div class="col-md-6">
-      <input class="form-control" id="lcdLine3" maxlength="20" placeholder="Satır 4">
+      <label class="form-label d-flex justify-content-between align-items-center">
+        <span>Satır 4</span>
+        <small class="text-secondary" id="lcdCount3">0/20</small>
+      </label>
+      <input class="form-control lcd-line" id="lcdLine3" data-idx="3" maxlength="64" placeholder="Durum:{safe} Saat:{time}">
     </div>
   </div>
 </div></div>
 
+<div class="card mb-3"><div class="card-body">
+  <h6 class="mb-2">Sensör kısayolları</h6>
+  <div class="small text-secondary mb-2">Seçili satıra eklemek için tıkla; şablon modunda otomatik güncellenir, manuel modda düz metin kalır.</div>
+  <div class="d-flex flex-wrap gap-2" id="lcdTokenButtons">
+    <button class="btn btn-outline-secondary btn-sm" data-lcd-token="{temp}">Sıcaklık {temp}</button>
+    <button class="btn btn-outline-secondary btn-sm" data-lcd-token="{hum}">Nem {hum}</button>
+    <button class="btn btn-outline-secondary btn-sm" data-lcd-token="{lux}">Işık {lux}</button>
+    <button class="btn btn-outline-secondary btn-sm" data-lcd-token="{soil_pct}">Toprak % {soil_pct}</button>
+    <button class="btn btn-outline-secondary btn-sm" data-lcd-token="{soil_raw}">Toprak raw {soil_raw}</button>
+    <button class="btn btn-outline-secondary btn-sm" data-lcd-token="{ds_temp}">DS18B20 {ds_temp}</button>
+    <button class="btn btn-outline-secondary btn-sm" data-lcd-token="{safe}">Durum {safe}</button>
+    <button class="btn btn-outline-secondary btn-sm" data-lcd-token="{time}">Saat {time}</button>
+    <button class="btn btn-outline-secondary btn-sm" data-lcd-token="{pump}">Pompa {pump}</button>
+    <button class="btn btn-outline-secondary btn-sm" data-lcd-token="{heater}">Isıtıcı {heater}</button>
+  </div>
+</div></div>
+
 <div class="card"><div class="card-body">
-  <h6 class="mb-2">Önizleme</h6>
+  <h6 class="mb-2">Önizleme (şablon çözülmüş)</h6>
   <div class="lcd-preview" id="lcdPreview"></div>
 </div></div>
 
