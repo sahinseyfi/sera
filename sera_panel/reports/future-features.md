@@ -50,18 +50,33 @@ It is aligned with the decision log and the new zone-first UI.
 - Mobile tabs for zones, desktop blocks/grid.
 - Simplified, zone-first pages.
 - Dedicated sensor config and calibration screen.
+- Manual control timers: “run for 15 minutes” + visible countdown + automation pause TTL.
 - Trend charts include:
   - SERA temp/hum
   - FIDE temp/hum
   - KAT1/KAT2 soil
   - KAT1/KAT2 LDR lux
+- Interactive charts:
+  - Zoom/pan + range selection (brush).
+  - Multi-series overlay and compare mode.
+  - Event markers (manual actions, alerts, automation changes).
 
 ## Data and Logs
-- Extend sensor log schema to include:
+- Storage layer options:
+  - Keep SQLite as default (simple backup, works offline) but move to a generic telemetry schema (metric key/value or JSON).
+  - Optional: add InfluxDB adapter later if long-range high-frequency analysis becomes important.
+  - Downsampling/aggregation endpoints so the UI stays fast on a Raspberry Pi.
+- Extend telemetry to include:
   - FIDE temp/hum
   - LDR lux per zone
   - KAT1/KAT2 soil
 - Add sensor catalog endpoint for dynamic UI metrics.
+- Add event/actuator log query UI (History page) with filters and CSV export.
+
+## Resilience & Data Quality
+- Sensor sanity checks (e.g., reject 150°C, negative humidity, impossible jumps).
+- Spike/outlier detection and temporary quarantine of faulty sensors.
+- Automation must ignore invalid data and fail-safe to OFF where applicable.
 
 ## Home Assistant
 - Clear HA grouping in the UI (backend badge + entity link).

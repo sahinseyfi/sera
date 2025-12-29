@@ -116,6 +116,27 @@ NotificationConfig = {
 }
 ```
 
+### 6.6 Telemetry / Logs
+```
+TelemetryPoint = {
+  ts: number,              // unix seconds
+  zone: ZoneId,
+  metric: string,          // e.g. 'temp_c', 'rh_pct', 'lux', 'soil_raw', 'soil_pct'
+  value: number,
+  unit?: string,
+  source?: string,         // sensorId or actuatorId
+  quality?: 'ok' | 'suspect' | 'invalid'
+}
+
+EventLog = {
+  ts: number,
+  level: 'info' | 'warning' | 'error',
+  category: string,        // 'sensor' | 'actuator' | 'automation' | 'system'
+  message: string,
+  meta?: object
+}
+```
+
 ## 7. Global UI Layout
 - Top bar: brand + SAFE MODE indicator + data age.
 - Secondary strip: last update time, stale warning, alert count.
@@ -156,6 +177,7 @@ NotificationConfig = {
 - SAFE MODE blocks all manual control.
 - Heater/pump require confirmation + countdown.
 - Display actuator cooldown if any.
+- Manual commands support duration (e.g., “run for 15 minutes”) where safe.
 
 ### 10.2 Grouping
 - Group by zone, then by role.
@@ -163,6 +185,11 @@ NotificationConfig = {
   - Current state
   - Last change + reason
   - Quick ON/OFF and duration (if allowed)
+
+### 10.3 Manual Override Sessions
+- Any manual action can set a temporary override TTL (e.g., 5/15/30 minutes).
+- While override is active, automation must not fight the manual state for that actuator.
+- UI must show remaining override time and provide a “cancel override” action.
 
 ## 11. Automation Page
 This is implemented as a sub-page under Settings: **Settings > Automation**.
@@ -234,6 +261,14 @@ This is implemented as the top-level **History** page.
 ### 14.2 Chart
 - Single main chart with legend.
 - Tooltip shows value + timestamp.
+- Interactive features:
+  - Zoom/pan.
+  - Range selection (brush) to focus on a window.
+  - Multi-series overlay (compare two metrics or zones).
+  - Event markers: actuator actions, alerts, automation state changes.
+- Performance requirements:
+  - Server-side aggregation/downsampling (1m/5m/15m/1h).
+  - Cache for common ranges (last 1h/6h/24h).
 
 ### 14.3 Export
 - CSV download for selected filter.
@@ -294,6 +329,11 @@ Settings is a shell with sub-pages. Default view should show the most-used contr
 - Stale data banner when last update exceeds threshold.
 - Sensor error badge on cards.
 - Disabled sensors show muted UI and help text.
+- Data quality states:
+  - Sanity checks (min/max ranges, impossible values).
+  - Spike/outlier detection (sudden jumps) marked as `suspect`.
+  - Quarantine mode for repeatedly failing sensors; automation ignores quarantined data.
+  - Clear UI explanation: what is ignored and which safety fallback is active.
 
 ## 23. Interaction Details
 - Auto-refresh every 2-3 seconds for live pages.
