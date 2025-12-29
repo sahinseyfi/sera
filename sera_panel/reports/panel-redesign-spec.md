@@ -36,10 +36,13 @@ architecture, layouts, states, and detailed component behavior.
 3) Control
 4) Automation
 5) Sensors
-6) Logs & Trends
-7) Reports
-8) Settings
-9) Help
+6) LCD / Display
+7) Logs & Trends
+8) Reports
+9) Updates
+10) Notes
+11) Settings
+12) Help
 
 Notes:
 - Overview is read-only summary.
@@ -100,6 +103,17 @@ Automation = {
   schedule: object,
   safety: object,
   sensor_id: string
+}
+```
+
+### 6.5 Notifications
+```
+NotificationConfig = {
+  enabled: boolean,
+  level: 'info' | 'warning' | 'error',
+  cooldown_seconds: number,
+  telegram_enabled: boolean,
+  email_enabled: boolean
 }
 ```
 
@@ -193,67 +207,97 @@ Automation = {
 - Step 3: Compute scale factor and save.
 - Step 4: Confirm converted lux value.
 
-## 13. Logs & Trends Page
+## 13. LCD / Display Page
 
-### 13.1 Filters
+### 13.1 LCD Settings
+- Enable/disable, mode (auto/template/manual), address, port, expander, charmap.
+
+### 13.2 Template Editor
+- 4x20 line editor with token buttons.
+- Zone-aware tokens (sera/kat1/kat2/fide).
+- Preview of the resolved output.
+
+### 13.3 Rotation
+- Optional auto-rotate between zone views.
+
+## 14. Logs & Trends Page
+
+### 14.1 Filters
 - Zone selector
 - Metric selector
 - Time range (24h, 7d)
 
-### 13.2 Chart
+### 14.2 Chart
 - Single main chart with legend.
 - Tooltip shows value + timestamp.
 
-### 13.3 Export
+### 14.3 Export
 - CSV download for selected filter.
 
-## 14. Reports Page
+## 15. Reports Page
 
-### 14.1 Daily Summary
+### 15.1 Daily Summary
 - One page per day with zone summary.
 - "Top 3" highlights: good, warning, action.
 
-### 14.2 Weekly Summary
+### 15.2 Weekly Summary
 - Trends and improvements per zone.
 
-## 15. Settings Page
-- Safe mode toggle
-- Limits (pump, heater)
-- Alerts thresholds
-- Notifications
-- Retention
-- Backup/restore
-- Admin token status
+## 16. Updates Page
+- User-friendly changelog from config.
+- Latest update date shown at top.
 
-## 16. Visual Language
+## 17. Notes Page
+- Curated improvement ideas grouped by topic.
+- Acts as a lightweight roadmap for internal use.
+
+## 18. Settings Page
+- Safe mode toggle.
+- Limits (pump, heater).
+- Alerts thresholds.
+- Energy pricing (kWh tiers).
+- Notifications (Telegram/Email enable, severity, cooldown, test send).
+- Retention (cleanup schedule, manual cleanup).
+- Backup/restore (JSON import/export).
+- Admin token status + input.
+
+## 19. Notifications & Integrations
+- Telegram + Email supported; show readiness in UI.
+- Home Assistant channels supported with entity IDs and backend badge.
+
+## 20. Visual Language
 - Typography: clear, compact, with strong headings.
 - Color: neutral background, strong accent for actions.
 - Badges: ok/warn/error colors for quick scan.
 - Avoid clutter; prefer 1-2 key metrics per card.
 
-## 17. Responsiveness
+## 21. Responsiveness
 - Mobile: tabs for zones + collapsible sections.
 - Desktop: multi-column layout with fixed card heights.
 - Charts scale down to 240px height on mobile.
 
-## 18. Status & Error States
+## 22. Status & Error States
 - Stale data banner when last update exceeds threshold.
 - Sensor error badge on cards.
 - Disabled sensors show muted UI and help text.
 
-## 19. Interaction Details
+## 23. Interaction Details
 - Auto-refresh every 2-3 seconds for live pages.
 - Manual refresh button available.
 - Confirm modals for critical actions.
 
-## 20. API Contracts (Suggested)
+## 24. API Contracts (Suggested)
 - `GET /api/status`: include zones, sensors, actuators, automation summary.
 - `GET /api/sensor_catalog`: list sensor definitions + status.
 - `POST /api/sensors`: update sensor config.
 - `POST /api/calibrate/ldr`: save LDR scale factor.
 - `GET /api/trends`: unified trend data by zone/metric.
+- `GET /api/updates`: UI updates feed.
+- `POST /api/notifications/test`: test send for Telegram/Email.
+- `GET /api/backup` and `POST /api/backup/restore`: backup/restore.
+- `POST /api/lcd`: LCD config + template lines.
 
-## 21. Migration Notes
+## 25. Migration Notes
 - Maintain backward compatibility for old config keys where possible.
 - Provide a one-time mapping of existing channels to zones.
 

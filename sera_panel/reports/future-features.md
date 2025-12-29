@@ -36,6 +36,16 @@ It is aligned with the decision log and the new zone-first UI.
 - Seedling heater uses FIDE sensor.
 - Heater sensor type is configurable from UI.
 
+## Notifications
+- Keep Telegram and Email support, add zone-specific alert rules.
+- Quiet hours and daily digest options.
+- Clear UI status for missing env vars.
+
+## LCD / Display
+- Zone-aware LCD templates (SERA + KAT1 + KAT2 + FIDE rotation).
+- New tokens: zone-specific temp/hum/soil/lux, data_age, alerts count.
+- Optional auto-rotate pages on LCD.
+
 ## UX / UI Enhancements
 - Mobile tabs for zones, desktop blocks/grid.
 - Simplified, zone-first pages.
@@ -53,6 +63,6 @@ It is aligned with the decision log and the new zone-first UI.
   - KAT1/KAT2 soil
 - Add sensor catalog endpoint for dynamic UI metrics.
 
-## Notifications (Optional Later)
-- Zone-aware alerts (e.g., "KAT1 soil dry").
-- Fan/heater state notifications for critical events.
+## Home Assistant
+- Clear HA grouping in the UI (backend badge + entity link).
+- Per-zone HA channel mapping.
