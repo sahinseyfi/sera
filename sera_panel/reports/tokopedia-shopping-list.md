@@ -29,6 +29,7 @@ Amaç: daha güvenli güç dağıtımı, daha temiz kablolama, daha iyi sensör 
 | MOSFET anahtarlama kartı | **8–16 kanal**, DC 5–36V, kanal başı **≥5A**, “low‑side” N‑MOSFET, 3.3V GPIO ile tetiklenebilir (veya üzerinde driver/opto) | 1 | 12V LED bar/fan/pompa için röleden daha sessiz ve PWM’e uygun | `MOSFET module 8 channel`, `MOSFET module 16 channel` |
 | Flyback diyot seti | En az 3A sınıfı (pompa/fan için) | 1 set | Endüktif yüklerde MOSFET’i ve Pi’yi korur | `flyback diode 3A`, `diode 1N5408` |
 | TVS diyot (12V hat) | 12V otomotiv sınıfı TVS (transient absorber) | 1–2 | Fan/pompa anahtarlamada oluşan sıçramaları bastırır | `TVS diode 12V` |
+| 12V fanlar (tamamlamak) | Tercihen **4‑wire PWM** (hız kontrol istersek), ball bearing; aynı model seç | 3–4 | Hedef kurulum: Kat1 fan + Kat2 fan + egzoz + (opsiyonel) fide fanı; 1 yedek iyi olur | `fan 12V PWM 4 wire`, `fan 12V 120mm` |
 
 > Röle kartların (1/2/4/8 kanal) var; AC yük/izolasyon gereken yerlerde hâlâ değerli.  
 > DC LED/fan işini MOSFET’e taşımak genelde daha temiz oluyor.
@@ -70,4 +71,3 @@ Ama birkaç kritik not:
 PWM’i “opsiyonel” tutmak için:
 - Donanım tarafında MOSFET kart seçerken PWM destekli ve 3.3V uyumlu olmasına dikkat et.
 - Yazılımda her kanal için “Mode: on/off vs pwm” şeklinde konfigürasyon mantığı planlanabilir.
-
