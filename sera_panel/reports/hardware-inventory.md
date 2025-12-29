@@ -4,8 +4,14 @@ Bu dosya; elindeki ekipmanları **model/özellik + adet + fiyat** ile kayıt alt
 Fiyatlar, senin paylaştığın birim fiyatlardır (kargo/indirim değişebilir).
 
 ## Özet
-- Kalem sayısı: 29
-- Toplam tutar: 6.389,16 TL
+- Kalem sayısı: 29 (+ 1 fiyatı eksik kalem)
+- Toplam tutar (fiyatı bilinenler): 6.389,16 TL
+
+## 0) Kontrol Bilgisayarı
+
+| Ürün | Model/Kod | Teknik detay | Adet | Birim (TL) | Toplam (TL) | Not / Kullanım |
+|---|---|---:|---:|---:|---:|---|
+| Raspberry Pi (ana kontrolcü) | Raspberry Pi 4 Model B (RAM: ?) | 5V/3A resmi adaptör + orijinal güç kablosu | 1 | — | — | Panel bilgisayarı (model/RAM ve fiyatı netleştirilecek) |
 
 ## 1) Sensörler ve Ölçüm Modülleri
 
