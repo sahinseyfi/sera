@@ -18,68 +18,85 @@ as a reference before the upcoming redesign.
 ## UI Pages (Current)
 
 ### Dashboard
-- Live sensor cards (DHT22, DS18B20, BH1750, ADS1115).
-- Summary row: safe mode, last data timestamp, alerts, automation state.
-- Automation status detail with window/override/min-off indicators.
-- Charts (metric selector + 24h/7d, CSV download).
-- Actuator state list (last change + reason).
+- Live sensor cards (DHT22, DS18B20, BH1750, ADS1115 raw channels).
+- Summary row: safe mode, last data timestamp + age, alerts count, automation state.
+- Automation status card with window, target minutes, override, block, min-off, last off reason.
+- Automation badge legend (active, override, lux error, max lux, off).
+- Charts: metric selector + 24h/7d range + CSV download.
+- Chart footer: min/max/last/count/last update.
+- Actuator state list (state, last change, reason, backend info).
 - Alerts list (latest 5).
-- Energy estimate (24h/7d, per-channel breakdown).
-- Sensor health list (last OK/ offline).
-- Event log (automation + manual actions).
+- Energy estimate (24h/7d totals + per-channel breakdown; note for timed-only channels).
+- Sensor health list (last OK, offline duration, offline limit note).
+- Event log (automation + manual events).
 
 ### Control
 - Manual relay control with SAFE MODE gating.
 - Emergency stop (all off).
-- Pump/heater confirmation flow + cooldown limits.
+- Pump/heater confirmation flow with countdown modal.
+- Per-channel cooldown notes (pump, heater).
 - Recent command list with reasons.
 
 ### Settings
-- SAFE MODE + limits (pump/heater max, cooldown, heater cutoff).
-- Automation rules:
-  - Lux automation (target minutes, lux OK/max, window, min on/off, manual override).
-  - Heater automation (sensor choice, temp band, min off, max on, night mode, fan required).
-  - Pump automation (soil channel, dry threshold, pulse, daily limit, window).
-  - Fan automation (RH high/low, max/min, night mode, periodic mode).
+- Panel restart button (systemd/exec/signal fallback).
+- Advanced mode toggle (beginner vs advanced sections).
+- Initial setup checklist (sensor/role mapping, token, limits).
+- Admin token input + status (stored in browser).
+- SAFE MODE toggle.
+- Limits: pump max + cooldown, heater max + cutoff.
+- Save button with saved status.
+- Automation sections:
+  - Lux (target minutes, lux OK/max, window, min on/off, manual override).
+  - Heater (sensor choice, temp band, max/min, night mode, fan required).
+  - Pump (soil channel, dry threshold, pulse, max daily, window, override).
+  - Fan (RH high/low, max/min, night mode, periodic mode).
+  - Soil calibration table with dry/wet quick capture buttons.
 - Alert thresholds (offline, temp/hum high/low).
-- Energy price settings (kWh pricing + threshold).
-- Notifications (Telegram/Email enable, severity level, cooldown, test send status).
+- Energy price settings (kWh tiers).
+- Notifications (Telegram/Email enable, level, cooldown, readiness status).
 - Retention/cleanup settings + manual cleanup trigger.
-- Backup/restore (JSON export/import).
-- Admin token input and status.
+- Backup/restore (JSON export/import; restore forces SAFE MODE).
 
 ### Hardware
 - Channel mapping table:
-  - name, role, backend (GPIO/HA), GPIO pin, active low, entity ID, power, quantity.
+  - name, active, role, backend (GPIO/HA), GPIO pin, active low, HA entity.
+  - description, power, quantity, total power, voltage, notes.
 - Sensor settings:
   - DHT22 GPIO, BH1750 addr, ADS1115 addr, DS18B20 enable.
 - Save action sets all channels OFF for safety.
 
 ### Logs
 - Sensor log table with filter fields (from/to, limit, interval, order).
+- Interval options: raw, 1, 5, 15, 30, 60 minutes.
 - CSV export for the selected range.
-- Log clear with admin confirmation.
+- Log clear (SQLite only; CSV files remain).
 
 ### Reports
 - Daily report: story summary, comparisons, progress bars, teaching cards.
 - Weekly report: summary cards + weekly chart + daily breakdown table.
-- Beginner mode toggle on reports.
+- Beginner mode toggle hides expert-only details.
+- Weather warning banner when external data is missing (if applicable).
 
 ### LCD
 - I2C LCD settings (enable, mode, address, port, expander, charmap, size).
-- Line editor (4x20) with template tokens.
-- Token list + preview output.
+- Line editor (4x20) with counters.
+- Clear lines and template preset buttons.
+- Token buttons insert into selected line.
+- Preview of resolved output.
 - LCD mode: auto / template / manual.
 
 ### Updates
 - Changelog list read from `config/updates.json` via `/api/updates`.
-- User-friendly summary text (non-technical).
+- Last update date shown at top.
+- Empty state message when no updates exist.
 
 ### Notes
-- Static improvement suggestions grouped by topic (safety, reliability, usability, observability).
+- Static improvement suggestions grouped by topic.
+- Data is rendered server-side and not user-editable.
 
 ### Help / FAQ
 - FAQ sections for dashboard, control, settings, logs, troubleshooting.
+- Explains OK/SIM/HATA/YOK status badges and stale data behavior.
 
 ## Sensors (Current)
 - DHT22: temp + humidity (GPIO).
@@ -100,7 +117,9 @@ as a reference before the upcoming redesign.
 
 ## LCD (Current)
 - LCD status is part of `/api/status` and can be updated via `/api/lcd`.
-- Template tokens include temp/hum/lux/soil/ds_temp/pump/heater/time/safe.
+- Template tokens include:
+  - `{temp}`, `{hum}`, `{lux}`, `{soil_pct}`, `{soil_raw}`, `{ds_temp}`.
+  - `{pump}`, `{heater}`, `{safe}`, `{time}`.
 
 ## Safety
 - SAFE MODE default ON: manual control locked, automation blocked.
@@ -137,6 +156,7 @@ as a reference before the upcoming redesign.
 - `GET /api/backup` and `POST /api/backup/restore`: backup/restore.
 - `POST /api/retention/cleanup`: manual cleanup.
 - `POST /api/lcd`: LCD config + lines.
+- `POST /api/panel/restart`: restart panel service.
 
 ## Environment Variables (Selected)
 - `SIMULATION_MODE`, `DISABLE_BACKGROUND_LOOPS`, `ADMIN_TOKEN`.
