@@ -51,6 +51,16 @@ Amaç: daha güvenli güç dağıtımı, daha temiz kablolama, daha iyi sensör 
 | DS18B20 prob (ek) | Waterproof, 1‑Wire | 1–2 | Yedek/karşılaştırma | `DS18B20 waterproof` |
 | I2C çoklayıcı (opsiyonel) | TCA9548A | 1 | Aynı adreste birden fazla I2C cihazı eklemek istersen büyütür | `TCA9548A I2C multiplexer` |
 
+## P2.5 — Dağıtık Düğüm (Opsiyonel): ESP32
+
+ESP32, serada **kablolamayı azaltmak** ve “kat/kapalı kutu” gibi yerlerde sensör/aktüatörü yerinde yönetmek için iyi.
+En güvenli kullanım: önce **sensör düğümü** olarak başla; kritik aktüatörleri (özellikle 230V ısıtıcı) Wi‑Fi’a bağlama.
+
+| Ürün | Önerilen özellik | Adet | Neden? | Tokopedia arama |
+|---|---|---:|---|---|
+| ESP32 geliştirme kartı | ESP32‑WROOM‑32 / DevKit V1, USB’li, 4MB flash (CH340/CP2102) | 2 | 1’i deneme/masa, 1’i seraya; ileride “kat düğümü” veya “fide kutusu” sensör düğümü | `ESP32 DevKit V1`, `ESP32 WROOM 32`, `modul ESP32` |
+| DC‑DC step‑down (opsiyonel) | 12V→5V **3A** buck (kaliteli) | 1–2 | ESP32’yi 12V ana hattan beslemek için (uzakta düğüm kurarsan) | `buck converter 12V 5V 3A`, `DC DC step down 12V to 5V` |
+
 ---
 
 ## P3 — “Arıza Olunca Fark Et” Katmanı
