@@ -170,6 +170,48 @@ Sensör kabloları:
 
 ---
 
+## 7.3 Kablo Uzayınca “Sensör Verisi Saçmalaması” (Neden + Pratik Çözüm)
+
+Bu çok normal: kablo uzadıkça gürültü artar, voltaj düşümü olur ve bazı protokoller uzun mesafede bozulur.
+Özellikle **PWM ile sürülen LED** ve **fan/pompa** gibi yükler devredeyken sensör kabloları “anten” gibi davranabilir.
+
+### 7.3.1 En sık sebepler
+- **Voltaj düşümü:** İnce/uzun kabloda sensörün beslemesi düşer → okuma kayar.
+- **Ortak GND’de gerilim sıçraması (ground bounce):** LED/fan akımı aynı GND’den dönüyorsa sensör referansı oynar.
+- **EMI (elektromanyetik gürültü):** PWM, motor, röle anahtarlaması sensör hattına gürültü bindirir.
+- **Protokol limiti:** I2C gibi bazı hatlar “kısa mesafe” içindir.
+
+### 7.3.2 Analog sensörler (soil + LDR) için altın kural
+- Analog hattı mümkünse **kısa tut** (pratikte hedef: **≤ 50 cm**).
+- Uzun mesafe gerekiyorsa “analog taşımak” yerine **ADC’yi sensöre yaklaştır** (kat düğümü/ESP32 gibi).
+- Analog kabloyu **signal+GND bükülü çift** yap (CAT5e/CAT6 kablo çok iş görür).
+- Kabloyu **LED/fan güç kablolarından ayrı** götür; mecbursa 90° kesiştir.
+- ADC girişinde basit filtre işe yarar: girişe **seri 100–470Ω** + ADC pininde **100nF GND’ye** (RC low-pass).
+
+### 7.3.3 I2C (BH1750, SHT31, ADS1115) için
+- I2C genelde **kısa mesafe** (kartlar arası) içindir; mümkünse **≤ 50 cm** hedefle.
+- Uzatacaksan:
+  - I2C hızını **100 kHz** (veya daha düşük) tut.
+  - Pull‑up dirençlerini (SDA/SCL) kablo uzunluğuna göre ayarla (tipik 4.7k → bazen 2.2k gerekebilir).
+  - Daha profesyonel çözüm: **I2C extender/differential** (PCA9615 gibi) veya kat başına düğüm.
+
+### 7.3.4 DS18B20 (1‑Wire) için
+- 1‑Wire kabloya daha toleranslıdır ama “yıldız topoloji” sorun çıkarır.
+- Tek hat (bus) gibi dolaştır; mümkünse 3‑wire (VCC+DATA+GND) kullan.
+- DATA için **4.7k pull‑up** (bazı durumlarda 2.2k) gerekebilir.
+
+### 7.3.5 DHT11/DHT22 için
+- DHT’ler uzun kabloda daha çok hata verir (checksum / “not found”).
+- Kısa kablo, doğru pull‑up ve stabil besleme şarttır; uzak ölçüm için SHT31 + düğüm yaklaşımı genelde daha iyi.
+
+### 7.3.6 En temiz mimari çözüm (uzun kablo kaçınılmazsa)
+- Kat başına küçük bir düğüm (ör. **ESP32**) koy:
+  - Sensörler düğüme **çok kısa kablo** ile bağlanır.
+  - Düğüm veriyi Pi’ye **Wi‑Fi (MQTT/HTTP)** veya istersen **kablolu (RS485)** yollar.
+- Katlara sadece **12V güç** götür (kalın kablo), düğümde **12V→5V buck** ile besle.
+
+---
+
 ## 8) Kablo Seçimi ve Kesit (Pratik Rehber)
 
 Kesin değer için yüklerin Watt’ını bilmek gerekir; burada pratik kural veriyorum:
