@@ -4,14 +4,14 @@ Bu dosya; elindeki ekipmanları **model/özellik + adet + fiyat** ile kayıt alt
 Fiyatlar, senin paylaştığın birim fiyatlardır (kargo/indirim değişebilir).
 
 ## Özet
-- Kalem sayısı: 29 (+ 1 fiyatı eksik kalem)
+- Kalem sayısı: 30 (1 kalemde fiyat eksik)
 - Toplam tutar (fiyatı bilinenler): 6.389,16 TL
 
 ## 0) Kontrol Bilgisayarı
 
 | Ürün | Model/Kod | Teknik detay | Adet | Birim (TL) | Toplam (TL) | Not / Kullanım |
 |---|---|---:|---:|---:|---:|---|
-| Raspberry Pi (ana kontrolcü) | Raspberry Pi 4 Model B (RAM: ?) | 5V/3A resmi adaptör + orijinal güç kablosu | 1 | — | — | Panel bilgisayarı (model/RAM ve fiyatı netleştirilecek) |
+| Raspberry Pi (ana kontrolcü) | Raspberry Pi 4 Model B (4GB) | USB‑C, 5V/3A resmi adaptör + orijinal güç kablosu | 1 | — | — | Panel bilgisayarı (fiyat bilgisi yok) |
 
 ## 1) Sensörler ve Ölçüm Modülleri
 
@@ -35,7 +35,7 @@ Fiyatlar, senin paylaştığın birim fiyatlardır (kargo/indirim değişebilir)
 | Ürün | Model/Kod | Teknik detay | Adet | Birim (TL) | Toplam (TL) | Not / Kullanım |
 |---|---|---:|---:|---:|---:|---|
 | 12V Fan 120×120×25mm | FAN0050 (XMER) | 12V, 0,45A, 2P | 1 | 140,62 | 140,62 | Egzoz veya kat fanı (ihtiyaca göre) |
-| PTC Isıtıcı Plaka | A0947 | 12V, 110°C, 35×21×5mm | 1 | 149,14 | 149,14 | Fide kutusu içi ısıtma için uygun |
+| PTC Isıtıcı Plaka | A0947 | 12V, max 110°C, 35×21×5mm, PTC (self‑regulating) | 1 | 149,14 | 149,14 | Fide kutusu içi ısıtma; watt/akım değeri netleşince sigorta+kablo kesinleşir |
 | Elektrikli Isıtıcı Fan | Kiwi KHT 8415 | 1000W/2000W, termostat, devrilme emniyeti | 1 | 617,40 | 617,40 | Sera genel ısıtma (AC) |
 | Akıllı WiFi Priz | Cata CT‑4010 | Uzaktan kontrol | 1 | 345,00 | 345,00 | Isıtıcıyı Home Assistant üzerinden sürmek için |
 
