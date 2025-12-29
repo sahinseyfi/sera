@@ -61,6 +61,16 @@ En güvenli kullanım: önce **sensör düğümü** olarak başla; kritik aktüa
 | ESP32 geliştirme kartı | ESP32‑WROOM‑32 / DevKit V1, USB’li, 4MB flash (CH340/CP2102) | 4 | KAT1 + KAT2 + FIDE için 3 düğüm + 1 yedek (Wi‑Fi/sensör/IO dağıtımı) | `ESP32 DevKit V1`, `ESP32 WROOM 32`, `modul ESP32` |
 | DC‑DC step‑down (opsiyonel) | 12V→5V **3A** buck (kaliteli) | 3–4 | Her ESP32 düğümünü 12V ana hattan stabil 5V ile beslemek için | `buck converter 12V 5V 3A`, `DC DC step down 12V to 5V` |
 
+## P2.6 — Kamera (Kat Görüntüsü)
+
+2 kat için pratik yaklaşım: **kat başına 1 kamera**.
+
+| Ürün | Önerilen özellik | Adet | Neden? | Tokopedia arama |
+|---|---|---:|---|---|
+| ESP32‑CAM kamera kiti | ESP32‑CAM (AI Thinker) + OV2640 + **USB‑Serial CH340 adapter** (MB/Downloader) | 2 | Kat1 + Kat2 snapshot/stream | `ESP32-CAM OV2640 CH340`, `ESP32 CAM MB CH340` |
+| Harici antenli versiyon (opsiyonel) | IPEX/u.FL konnektörlü ESP32‑CAM + anten | 2 | Sera içinde Wi‑Fi çekimi zayıfsa fark eder | `ESP32-CAM external antenna`, `ESP32 CAM IPEX` |
+| 5V besleme (kamera için) | Her kamera için stabil 5V (tercihen 1A+); 12V hattan beslenecekse buck | 2 | ESP32‑CAM güç dalgalanmasına hassas; reset/stream kopmasını azaltır | `buck 12V to 5V 2A`, `power supply 5V 2A` |
+
 ---
 
 ## P3 — “Arıza Olunca Fark Et” Katmanı
