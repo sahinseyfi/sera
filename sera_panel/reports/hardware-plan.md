@@ -182,9 +182,15 @@ Kesin değer için yüklerin Watt’ını bilmek gerekir; burada pratik kural ve
 - Sensör kabloları: 0.22–0.5 mm² (ince, bükülü)
 
 Pratik formül:
-- Akım (A) = Güç (W) / 12V\n+
+- Akım (A) = Güç (W) / 12V
+
 Örnek:
 - 24W LED → 24/12 = 2A (kat başına bu artabilir)
+
+Bu projedeki LED bar için (senin verdiğin değerlere göre):
+- 1 adet 1m LED bar: **12V, 1,4–2A** → yaklaşık **17–24W**
+- 4 adet bar tamamı açık (worst-case): **5,6–8A** (yalnızca LED’ler)
+  - 12V 8,5A adaptör, LED’ler full açıkken fan/PTC eklenirse sınırda kalabilir; PSU’yu headroom ile seçmek daha güvenli.
 
 ---
 
@@ -276,12 +282,13 @@ Basit şema (genel fikir):
 
 ## 13) Netleştirmemiz Gereken 3 Veri (donanımı kesinleştirmek için)
 
-1) LED şeritlerin **voltajı (12V/24V)** ve **kat başına toplam Watt**?\n
-2) Fanların voltajı ve yaklaşık Watt/Ampere değeri?\n
-3) Sera ısıtıcı ve fide ısıtıcı **AC mi DC mi**, kaç Watt?\n
+1) LED bar bilgisi geldi:
+   - 1m bar, 72 LED/m, 1000–1800 lm, **12V 1,4–2A** (≈17–24W)
+   - Toplam 4 bar (Kat1 LED1/LED2 + Kat2 LED1/LED2)
+2) Fanların voltajı ve yaklaşık Watt/Ampere değeri? (Kat1 fan, Kat2 fan, egzoz fan, fide fan)
+3) Sera ısıtıcı ve fide ısıtıcı **AC mi DC mi**, kaç Watt?
 
-Bu üç bilgi gelince:\n
-- 12V PSU gücünü net seçeriz,\n
-- kablo kesitini “tam” belirleriz,\n
-- sigorta değerlerini netleştiririz.\n
-
+Bu üç bilgi gelince:
+- 12V PSU gücünü net seçeriz,
+- kablo kesitini “tam” belirleriz,
+- sigorta değerlerini netleştiririz.

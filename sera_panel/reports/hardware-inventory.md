@@ -21,7 +21,7 @@ Fiyatlar, senin paylaştığın birim fiyatlardır (kargo/indirim değişebilir)
 
 | Ürün | Model/Kod | Teknik detay | Adet | Birim (TL) | Toplam (TL) | Not / Kullanım |
 |---|---|---:|---:|---:|---:|---|
-| 12V LED Bar Alüminyum Çubuk | 5730/5630, 72 LED, 6500K | 12V, 72 LED, beyaz 6500K | 4 | 51,21 | 204,84 | Kat1: LED1/LED2, Kat2: LED1/LED2 (kademeli lux kontrol) |
+| 12V LED Bar Alüminyum Çubuk | 5730/5630, 72 LED, 6500K | 100cm, 72 LED/m, 1000–1800 lm, 12V, 1,4–2A (≈17–24W) | 4 | 51,21 | 204,84 | Kat1: LED1/LED2, Kat2: LED1/LED2 (kademeli lux kontrol) |
 | LED Profil (1m) | PJ1094 | Şeffaf kapaklı profil | 4 | 55,48 | 221,92 | LED bar montaj/profil |
 
 ## 3) Fanlar ve Isıtma
