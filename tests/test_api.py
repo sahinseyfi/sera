@@ -14,6 +14,8 @@ def test_status_endpoint():
     data = resp.get_json()
     assert "sensor_readings" in data
     assert "actuator_state" in data
+    assert "notifications" in data
+    assert "retention" in data
     assert data["safe_mode"] is True
 
 
@@ -42,3 +44,12 @@ def test_pump_rules_and_limits():
     resp = client.post("/api/actuator/R3_PUMP", json={"state": "on", "seconds": 3})
     assert resp.status_code == 403
     time.sleep(1)
+
+
+def test_notifications_test_endpoint_blocked_in_simulation():
+    client = app.app.test_client()
+    resp = client.post("/api/notifications/test", json={"message": "hello"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["sent"] is False
+    assert body["reason"] == "simulation_blocked"

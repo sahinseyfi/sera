@@ -1,6 +1,12 @@
 const state = {
   status: null,
   poller: null,
+  connection: {
+    ok: false,
+    lastOk: 0,
+    lastError: 0,
+    errorCount: 0,
+  },
   lcdActiveInput: null,
   history: {
     metric: 'dht_temp',
@@ -46,6 +52,20 @@ function formatDate(ts) {
   } catch (e) {
     return ts;
   }
+}
+
+function setConnectionStatus(ok, note) {
+  const el = document.getElementById('connectionStatus');
+  if (!el) return;
+  if (ok) {
+    el.textContent = 'Bağlantı: OK';
+    el.classList.remove('text-danger');
+    el.classList.add('text-secondary');
+    return;
+  }
+  el.textContent = note ? `Bağlantı: Kesildi (${note})` : 'Bağlantı: Kesildi';
+  el.classList.remove('text-secondary');
+  el.classList.add('text-danger');
 }
 
 function formatUnixSeconds(ts) {
@@ -175,13 +195,25 @@ function renderStatus(status) {
 }
 
 function poll() {
-  fetch('/api/status')
-    .then(r => r.json())
-    .then(data => {
+  fetch('/api/status', { cache: 'no-store' })
+    .then(async r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
       state.status = data;
+      state.connection.ok = true;
+      state.connection.lastOk = Date.now();
+      setConnectionStatus(true);
       renderStatus(data);
     })
-    .catch(() => {});
+    .catch(() => {
+      state.connection.ok = false;
+      state.connection.lastError = Date.now();
+      state.connection.errorCount += 1;
+      const note = state.connection.lastOk
+        ? `son OK: ${new Date(state.connection.lastOk).toLocaleTimeString()}`
+        : 'son OK: ---';
+      setConnectionStatus(false, note);
+    });
 }
 
 window.initDashboard = function() {
@@ -553,6 +585,8 @@ window.initControl = function() {
   if (emergencyBtn) {
     emergencyBtn.onclick = () => {
       if (emergencyBtn.disabled) return;
+      const ok = window.prompt('Acil Durdur: Tüm kanallar OFF yapılacak. Onay için YES yaz:');
+      if (ok !== 'YES') return;
       fetch('/api/emergency_stop', { method: 'POST', headers: adminHeaders() }).then(() => poll());
     };
   }
@@ -1075,7 +1109,25 @@ function initAdminToken() {
 window.initSettings = function() {
   poll();
   state.poller = setInterval(poll, 2500);
-  document.getElementById('saveSettings').onclick = saveSettings;
+  const saveBtn = document.getElementById('saveSettings');
+  if (saveBtn) saveBtn.onclick = saveSettings;
+  const saveBtnBottom = document.getElementById('saveSettingsBottom');
+  if (saveBtnBottom) saveBtnBottom.onclick = saveSettings;
+  const testNotifBtn = document.getElementById('testNotificationBtn');
+  if (testNotifBtn) testNotifBtn.onclick = sendTestNotification;
+  const runRetentionBtn = document.getElementById('runRetentionCleanupBtn');
+  if (runRetentionBtn) runRetentionBtn.onclick = runRetentionCleanup;
+  const jump = document.getElementById('settingsSectionJump');
+  if (jump) {
+    jump.onchange = () => {
+      const id = (jump.value || '').trim();
+      if (!id) return;
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      jump.value = '';
+    };
+  }
   initAdminToken();
   bindCalibrationButtons();
 };
@@ -1099,8 +1151,11 @@ function bindCalibrationButtons() {
 }
 
 function saveSettings() {
-  const savedNote = document.getElementById('settingsSavedNote');
-  if (savedNote) savedNote.textContent = '';
+  const savedNotes = [
+    document.getElementById('settingsSavedNote'),
+    document.getElementById('settingsSavedNoteBottom'),
+  ].filter(Boolean);
+  savedNotes.forEach(el => { el.textContent = ''; });
   if (state.settingsSavedTimer) {
     clearTimeout(state.settingsSavedTimer);
     state.settingsSavedTimer = null;
@@ -1117,9 +1172,22 @@ function saveSettings() {
     const value = parseInt(el.value, 10);
     return Number.isFinite(value) ? value : fallback;
   };
+  const readBool = (id, fallback) => {
+    const el = document.getElementById(id);
+    if (!el) return fallback;
+    return !!el.checked;
+  };
+  const readStr = (id, fallback) => {
+    const el = document.getElementById(id);
+    if (!el) return fallback;
+    const value = (el.value || '').trim();
+    return value === '' ? fallback : value;
+  };
   const currentLimits = state.status?.limits || {};
   const currentAuto = state.status?.automation || {};
   const currentAlerts = state.status?.alerts_config || {};
+  const currentNotifications = state.status?.notifications?.config || {};
+  const currentRetention = state.status?.retention?.config || {};
   const tokenInput = document.getElementById('adminTokenInput');
   if (tokenInput) {
     const value = tokenInput.value.trim();
@@ -1221,6 +1289,22 @@ function saveSettings() {
       hum_high_pct: alertHumHigh,
       hum_low_pct: alertHumLow,
     },
+    notifications: {
+      enabled: readBool('notifyEnabled', currentNotifications.enabled ?? true),
+      level: readStr('notifyLevel', currentNotifications.level ?? 'warning'),
+      cooldown_seconds: Math.max(0, readInt('notifyCooldown', currentNotifications.cooldown_seconds ?? 300)),
+      telegram_enabled: readBool('notifyTelegramEnabled', currentNotifications.telegram_enabled ?? false),
+      email_enabled: readBool('notifyEmailEnabled', currentNotifications.email_enabled ?? false),
+      allow_simulation: readBool('notifyAllowSimulation', currentNotifications.allow_simulation ?? false),
+    },
+    retention: {
+      sensor_log_days: Math.max(0, readInt('retentionSensorDays', currentRetention.sensor_log_days ?? 0)),
+      event_log_days: Math.max(0, readInt('retentionEventDays', currentRetention.event_log_days ?? 0)),
+      actuator_log_days: Math.max(0, readInt('retentionActuatorDays', currentRetention.actuator_log_days ?? 0)),
+      archive_enabled: readBool('retentionArchiveEnabled', currentRetention.archive_enabled ?? false),
+      archive_dir: readStr('retentionArchiveDir', currentRetention.archive_dir ?? 'data/archives'),
+      cleanup_interval_hours: Math.max(1, readInt('retentionIntervalHours', currentRetention.cleanup_interval_hours ?? 24)),
+    },
   };
   fetch('/api/settings', {
     method: 'POST',
@@ -1231,17 +1315,66 @@ function saveSettings() {
     if (!r.ok) {
       const msg = body.error || 'Ayar kaydi basarisiz.';
       alert(msg);
-      if (savedNote) savedNote.textContent = '';
+      savedNotes.forEach(el => { el.textContent = ''; });
       return;
     }
-    if (savedNote) {
-      savedNote.textContent = 'Kaydedildi';
+    if (savedNotes.length) {
+      savedNotes.forEach(el => { el.textContent = 'Kaydedildi'; });
       state.settingsSavedTimer = setTimeout(() => {
-        savedNote.textContent = '';
+        savedNotes.forEach(el => { el.textContent = ''; });
         state.settingsSavedTimer = null;
       }, 3000);
     }
     poll();
+  });
+}
+
+function sendTestNotification() {
+  const result = document.getElementById('notifyTestResult');
+  if (result) result.textContent = '';
+  const msgEl = document.getElementById('notifyTestMessage');
+  const message = msgEl ? msgEl.value.trim() : '';
+  fetch('/api/notifications/test', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify({ severity: 'info', message }),
+  }).then(async r => {
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const msg = body.error || 'Test bildirimi başarısız.';
+      if (result) result.textContent = msg;
+      return;
+    }
+    if (result) {
+      if (body.sent) result.textContent = 'Gönderildi';
+      else result.textContent = `Gönderilmedi: ${body.reason || '---'}`;
+    }
+    poll();
+  }).catch(() => {
+    if (result) result.textContent = 'Test bildirimi başarısız.';
+  });
+}
+
+function runRetentionCleanup() {
+  const result = document.getElementById('retentionCleanupResult');
+  if (result) result.textContent = '';
+  const ok = window.prompt('Veri temizliği çalışacak. Silme geri alınamaz. Onay için YES yaz:');
+  if (ok !== 'YES') return;
+  fetch('/api/maintenance/retention_cleanup', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify({}),
+  }).then(async r => {
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const msg = body.error || 'Temizlik başarısız.';
+      if (result) result.textContent = msg;
+      return;
+    }
+    if (result) result.textContent = 'Tamamlandı';
+    poll();
+  }).catch(() => {
+    if (result) result.textContent = 'Temizlik başarısız.';
   });
 }
 
@@ -1321,6 +1454,45 @@ window.renderSettings = function(data) {
     if (dryInput) dryInput.value = entry.dry ?? '';
     if (wetInput) wetInput.value = entry.wet ?? '';
   });
+
+  const notifStatus = data.notifications || {};
+  const notifCfg = notifStatus.config || {};
+  const notifyEnabled = document.getElementById('notifyEnabled');
+  if (notifyEnabled) notifyEnabled.checked = notifCfg.enabled !== false;
+  const notifyLevel = document.getElementById('notifyLevel');
+  if (notifyLevel) notifyLevel.value = notifCfg.level ?? 'warning';
+  const notifyCooldown = document.getElementById('notifyCooldown');
+  if (notifyCooldown) notifyCooldown.value = notifCfg.cooldown_seconds ?? 300;
+  const notifyTelegramEnabled = document.getElementById('notifyTelegramEnabled');
+  if (notifyTelegramEnabled) notifyTelegramEnabled.checked = notifCfg.telegram_enabled === true;
+  const notifyAllowSimulation = document.getElementById('notifyAllowSimulation');
+  if (notifyAllowSimulation) notifyAllowSimulation.checked = notifCfg.allow_simulation === true;
+  const notifyEmailEnabled = document.getElementById('notifyEmailEnabled');
+  if (notifyEmailEnabled) notifyEmailEnabled.checked = notifCfg.email_enabled === true;
+  const telegramCfg = document.getElementById('telegramConfigStatus');
+  if (telegramCfg) {
+    const configured = !!(notifStatus.runtime && notifStatus.runtime.telegram_configured);
+    telegramCfg.textContent = configured ? 'Hazır' : 'Eksik';
+  }
+
+  const retentionStatus = data.retention || {};
+  const retentionCfg = retentionStatus.config || {};
+  const retentionSensorDays = document.getElementById('retentionSensorDays');
+  if (retentionSensorDays) retentionSensorDays.value = retentionCfg.sensor_log_days ?? 0;
+  const retentionEventDays = document.getElementById('retentionEventDays');
+  if (retentionEventDays) retentionEventDays.value = retentionCfg.event_log_days ?? 0;
+  const retentionActuatorDays = document.getElementById('retentionActuatorDays');
+  if (retentionActuatorDays) retentionActuatorDays.value = retentionCfg.actuator_log_days ?? 0;
+  const retentionIntervalHours = document.getElementById('retentionIntervalHours');
+  if (retentionIntervalHours) retentionIntervalHours.value = retentionCfg.cleanup_interval_hours ?? 24;
+  const retentionArchiveEnabled = document.getElementById('retentionArchiveEnabled');
+  if (retentionArchiveEnabled) retentionArchiveEnabled.checked = retentionCfg.archive_enabled === true;
+  const retentionArchiveDir = document.getElementById('retentionArchiveDir');
+  if (retentionArchiveDir) retentionArchiveDir.value = retentionCfg.archive_dir ?? 'data/archives';
+  const lastCleanup = document.getElementById('retentionLastCleanup');
+  if (lastCleanup) {
+    lastCleanup.textContent = retentionStatus.last_cleanup_ts ? formatUnixSeconds(retentionStatus.last_cleanup_ts) : '---';
+  }
 };
 
 window.initPins = function() {
@@ -1514,6 +1686,8 @@ function saveHardware() {
       enabled: enabledI ? enabledI.checked : true,
     };
   });
+  const ok = window.prompt('Kaydedince tüm kanallar güvenlik için OFF yapılır. Onay için YES yaz:');
+  if (ok !== 'YES') return;
   fetch('/api/config', {
     method: 'POST',
     headers: adminHeaders(),

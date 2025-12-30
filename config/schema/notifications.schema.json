@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "notifications.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "enabled",
+    "level",
+    "cooldown_seconds",
+    "telegram_enabled",
+    "email_enabled",
+    "allow_simulation"
+  ],
+  "properties": {
+    "enabled": { "type": "boolean" },
+    "level": { "type": "string", "enum": ["debug", "info", "warning", "error"] },
+    "cooldown_seconds": { "type": "integer", "minimum": 0 },
+    "telegram_enabled": { "type": "boolean" },
+    "email_enabled": { "type": "boolean" },
+    "allow_simulation": { "type": "boolean" }
+  }
+}

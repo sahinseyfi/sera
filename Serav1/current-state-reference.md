@@ -106,7 +106,7 @@ as a reference before the upcoming redesign.
 
 ## Notifications (Current)
 Not implemented in the current (main) codebase.
-Planned in `sera_panel/reports/future-features.md` and `sera_panel/reports/panel-redesign-spec.md`.
+Planned in `Serav1/future-features.md` and `Serav1/panel-redesign-spec.md`.
 
 ## LCD (Current)
 - LCD status is part of `/api/status` and can be updated via `/api/lcd`.
@@ -139,7 +139,7 @@ Planned in `sera_panel/reports/future-features.md` and `sera_panel/reports/panel
 
 ## Home Assistant Integration
 Not implemented in the current (main) codebase.
-Planned in `sera_panel/reports/future-features.md` and `sera_panel/reports/panel-redesign-spec.md`.
+Planned in `Serav1/future-features.md` and `Serav1/panel-redesign-spec.md`.
 
 ## API (Selected)
 - `GET /api/status`: full status payload for UI.

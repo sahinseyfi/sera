@@ -8,31 +8,32 @@ It is aligned with the decision log and the new zone-first UI.
 - Every actuator and sensor is assigned to a zone.
 - UI groups all controls and metrics by zone.
 
+## Node Model (ESP32 per Zone)
+- One ESP32 (ESP32-CAM) node per zone where practical (KAT1, KAT2, FIDE; optional SERA).
+- Nodes handle local sensor reads (I2C + analog) and provide a camera snapshot/stream endpoint.
+- Raspberry Pi polls/receives telemetry + images, stores them, and runs all automation + image processing.
+
 ## Sensors
-- Support multiple temp/hum sensors with type selection:
-  - DHT11, DHT22, SHT31 (future-ready).
-- ADS1115 mapping:
-  - CH0 -> KAT1 soil
-  - CH1 -> KAT2 soil
-  - CH2 -> KAT1 LDR
-  - CH3 -> KAT2 LDR
-- LDR calibration tool:
-  - Place LDR next to BH1750, measure both, store scale factor.
-  - Convert raw LDR to lux using scale factor.
+- Temp/hum per zone via SHT31 (default) connected to the zone’s ESP32 node.
+- Lux per zone via BH1750 connected to the zone’s ESP32 node.
+- Soil moisture (capacitive) per floor connected to the floor’s ESP32 node.
+- Note: ESP32‑CAM boards often have limited free ADC pins; if you need multiple analog sensors per node, add an I2C ADC (e.g., ADS1115) on that node.
+- Keep DHT11/22 as optional legacy support only if needed.
 
 ## Lux and Light Control
-- Per-zone stepped light control:
-  - LED1 ON -> re-measure -> LED2 ON if needed.
-  - When lux is high, turn off LED2 first, then LED1.
+- Per-zone PWM dimming light control (single channel per zone):
+  - Increase/decrease duty cycle based on lux error, then re-measure after a short delay.
+  - Use min/max duty, max step size, and a minimum update interval to avoid oscillation.
 - Lux thresholds per zone.
-- Safe min on/off and measurement delay between steps.
+- Safe measurement delay + cooldown rules between duty updates.
 
 ## Fans
 - Exhaust fan automation only (based on humidity or rules).
-- Canopy fans: "Always ON" toggle in UI, with SAFE MODE override.
+- Canopy fans: on/off via relay; default ON with an explicit toggle in UI, SAFE MODE can force OFF.
+- FIDE box fan (optional): default to running with the FIDE heater; optionally add an "Always ON" toggle.
 
 ## Heating
-- Greenhouse heater uses global sensor (SERA).
+- Greenhouse heater uses a configurable sensor (default: SERA zone sensor if present).
 - Seedling heater uses FIDE sensor.
 - Heater sensor type is configurable from UI.
 
@@ -66,11 +67,16 @@ It is aligned with the decision log and the new zone-first UI.
   - SERA temp/hum
   - FIDE temp/hum
   - KAT1/KAT2 soil
-  - KAT1/KAT2 LDR lux
+  - KAT1/KAT2 BH1750 lux
 - Interactive charts:
   - Zoom/pan + range selection (brush).
   - Multi-series overlay and compare mode.
   - Event markers (manual actions, alerts, automation changes).
+
+## Cameras & Image Processing
+- Each zone node can provide a camera snapshot/stream (ESP32‑CAM).
+- Raspberry Pi pulls images on a schedule and runs all processing (plant growth, leaf color/health, condensation/mold detection, “lights actually on?” checks).
+- Store only small snapshots by default (retention policy), keep “event snapshots” (alerts) longer.
 
 ## Data and Logs
 - Storage layer options:
@@ -79,8 +85,10 @@ It is aligned with the decision log and the new zone-first UI.
   - Downsampling/aggregation endpoints so the UI stays fast on a Raspberry Pi.
 - Extend telemetry to include:
   - FIDE temp/hum
-  - LDR lux per zone
-  - KAT1/KAT2 soil
+  - BH1750 lux per zone
+  - KAT1/KAT2 soil (multi-sensor ready)
+- Add camera snapshot metadata:
+  - last image timestamp per zone, last processing result, confidence/quality.
 - Add sensor catalog endpoint for dynamic UI metrics.
 - Add event/actuator log query UI (History page) with filters and CSV export.
 

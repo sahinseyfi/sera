@@ -30,6 +30,9 @@ TEST_PANEL_DIR = BASE_DIR / "sera_panel"
 DATA_DIR.mkdir(exist_ok=True)
 CHANNEL_CONFIG_PATH = CONFIG_DIR / "channels.json"
 SENSORS_CONFIG_PATH = CONFIG_DIR / "sensors.json"
+NOTIFICATIONS_CONFIG_PATH = CONFIG_DIR / "notifications.json"
+RETENTION_CONFIG_PATH = CONFIG_DIR / "retention.json"
+PANEL_CONFIG_PATH = CONFIG_DIR / "panel.json"
 UPDATES_PATH = CONFIG_DIR / "updates.json"
 DB_PATH = DATA_DIR / "sera.db"
 SENSOR_CSV_LOG_DIR = DATA_DIR / "sensor_logs"
@@ -52,6 +55,22 @@ DEFAULT_ALERTS = {
     "temp_low_c": 0,
     "hum_high_pct": 85,
     "hum_low_pct": 0,
+}
+DEFAULT_NOTIFICATIONS = {
+    "enabled": True,
+    "level": "warning",
+    "cooldown_seconds": 300,
+    "telegram_enabled": True,
+    "email_enabled": False,
+    "allow_simulation": False,
+}
+DEFAULT_RETENTION = {
+    "sensor_log_days": 0,
+    "event_log_days": 0,
+    "actuator_log_days": 0,
+    "archive_enabled": False,
+    "archive_dir": "data/archives",
+    "cleanup_interval_hours": 24,
 }
 DEFAULT_AUTOMATION = {
     "enabled": False,
@@ -118,6 +137,8 @@ ADMIN_TOKEN = os.getenv("ADMIN_TOKEN")
 LIGHT_CHANNEL_NAME = os.getenv("LIGHT_CHANNEL_NAME")
 FAN_CHANNEL_NAME = os.getenv("FAN_CHANNEL_NAME")
 PUMP_CHANNEL_NAME = os.getenv("PUMP_CHANNEL_NAME")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 
 def _parse_hhmm(value: str) -> dt_time:
@@ -1519,10 +1540,114 @@ class AutomationEngine:
         self.pump_last_auto_ts = time.time()
 
 
+class NotificationManager:
+    def __init__(self, config: Dict[str, Any]) -> None:
+        self.lock = threading.Lock()
+        self.config: Dict[str, Any] = dict(DEFAULT_NOTIFICATIONS)
+        self.config.update(config or {})
+        self._last_sent_ts: float = 0.0
+
+    def update_config(self, config: Dict[str, Any]) -> None:
+        with self.lock:
+            merged = dict(DEFAULT_NOTIFICATIONS)
+            merged.update(config or {})
+            self.config = merged
+
+    def public_status(self) -> Dict[str, Any]:
+        with self.lock:
+            cfg = dict(self.config)
+        return {
+            "config": cfg,
+            "runtime": {
+                "simulation": SIMULATION_MODE,
+                "telegram_configured": bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID),
+            },
+        }
+
+    def notify_alert(self, severity: str, message: str) -> None:
+        if not message:
+            return
+        with self.lock:
+            cfg = dict(self.config)
+            last_ts = float(self._last_sent_ts or 0.0)
+        if not cfg.get("enabled", True):
+            return
+        if SIMULATION_MODE and not cfg.get("allow_simulation", False):
+            return
+        if not cfg.get("telegram_enabled", False):
+            return
+        if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+            return
+        cooldown = int(cfg.get("cooldown_seconds", 0) or 0)
+        if cooldown > 0 and time.time() - last_ts < cooldown:
+            return
+        if not self._level_allows(str(cfg.get("level") or "warning"), str(severity or "info")):
+            return
+
+        text = f"AKILLI SERA • {severity.upper()}\n{message}"
+        ok, _error = self._send_telegram(text)
+        if not ok:
+            return
+        with self.lock:
+            self._last_sent_ts = time.time()
+
+    def send_test(self, message: str) -> Dict[str, Any]:
+        msg = (message or "").strip() or "Test bildirimi: AKILLI SERA paneli çalışıyor."
+        with self.lock:
+            cfg = dict(self.config)
+        if not cfg.get("enabled", True):
+            return {"sent": False, "reason": "disabled"}
+        if SIMULATION_MODE and not cfg.get("allow_simulation", False):
+            return {"sent": False, "reason": "simulation_blocked"}
+        if not cfg.get("telegram_enabled", False):
+            return {"sent": False, "reason": "telegram_disabled"}
+        if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+            return {"sent": False, "reason": "telegram_not_configured"}
+        text = f"AKILLI SERA • TEST\n{msg}"
+        ok, error = self._send_telegram(text)
+        if not ok:
+            return {"sent": False, "reason": "send_failed", "error": error}
+        with self.lock:
+            self._last_sent_ts = time.time()
+        return {"sent": True}
+
+    @staticmethod
+    def _level_allows(config_level: str, severity: str) -> bool:
+        order = {"debug": 10, "info": 20, "warning": 30, "error": 40}
+        cfg = order.get(config_level.strip().lower(), 30)
+        sev = order.get(severity.strip().lower(), 20)
+        return sev >= cfg
+
+    @staticmethod
+    def _send_telegram(text: str) -> Tuple[bool, Optional[str]]:
+        import urllib.parse
+        import urllib.request
+
+        token = TELEGRAM_BOT_TOKEN
+        chat_id = TELEGRAM_CHAT_ID
+        if not token or not chat_id:
+            return False, "not_configured"
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "disable_web_page_preview": True,
+        }
+        data = urllib.parse.urlencode(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:  # noqa: S310 (expected outbound call)
+                resp.read()
+        except Exception as exc:
+            return False, type(exc).__name__
+        return True, None
+
+
 class AlertManager:
-    def __init__(self) -> None:
+    def __init__(self, notifier: Optional["NotificationManager"] = None) -> None:
         self.alerts: List[Dict[str, Any]] = []
         self.lock = threading.Lock()
+        self.notifier = notifier
 
     def add(self, severity: str, message: str) -> None:
         with self.lock:
@@ -1530,10 +1655,124 @@ class AlertManager:
             self.alerts.append({"severity": severity, "message": message, "ts": ts})
             self.alerts = self.alerts[-50:]
         log_event("alert", severity, message, None)
+        if self.notifier:
+            try:
+                self.notifier.notify_alert(severity, message)
+            except Exception:
+                pass
 
     def get(self) -> List[Dict[str, Any]]:
         with self.lock:
             return list(self.alerts)
+
+
+class RetentionManager:
+    def __init__(self, config: Dict[str, Any]) -> None:
+        self.lock = threading.Lock()
+        self.config: Dict[str, Any] = dict(DEFAULT_RETENTION)
+        self.config.update(config or {})
+        self.last_cleanup_ts: float = 0.0
+
+    def update_config(self, config: Dict[str, Any]) -> None:
+        with self.lock:
+            merged = dict(DEFAULT_RETENTION)
+            merged.update(config or {})
+            self.config = merged
+
+    def public_status(self) -> Dict[str, Any]:
+        with self.lock:
+            return {"config": dict(self.config), "last_cleanup_ts": self.last_cleanup_ts or None}
+
+    def cleanup_if_due(self) -> None:
+        with self.lock:
+            cfg = dict(self.config)
+            last_ts = float(self.last_cleanup_ts or 0.0)
+        if (
+            int(cfg.get("sensor_log_days", 0) or 0) <= 0
+            and int(cfg.get("event_log_days", 0) or 0) <= 0
+            and int(cfg.get("actuator_log_days", 0) or 0) <= 0
+            and not bool(cfg.get("archive_enabled"))
+        ):
+            return
+        interval_h = int(cfg.get("cleanup_interval_hours", 24) or 24)
+        interval_s = max(1, interval_h) * 3600
+        if time.time() - last_ts < interval_s:
+            return
+        self.cleanup_now()
+
+    def cleanup_now(self) -> None:
+        with self.lock:
+            cfg = dict(self.config)
+        now = time.time()
+        summary: Dict[str, Any] = {"sensor_log": 0, "event_log": 0, "actuator_log": 0, "csv_files": 0}
+
+        sensor_days = int(cfg.get("sensor_log_days", 0) or 0)
+        event_days = int(cfg.get("event_log_days", 0) or 0)
+        actuator_days = int(cfg.get("actuator_log_days", 0) or 0)
+
+        archive_enabled = bool(cfg.get("archive_enabled"))
+        archive_dir_raw = str(cfg.get("archive_dir") or "data/archives")
+        archive_dir = (BASE_DIR / archive_dir_raw).resolve()
+        if not str(archive_dir).startswith(str(BASE_DIR.resolve())):
+            archive_dir = (DATA_DIR / "archives").resolve()
+        if archive_enabled:
+            try:
+                archive_dir.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                archive_enabled = False
+
+        if archive_enabled:
+            try:
+                import shutil
+
+                stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+                shutil.copy2(DB_PATH, archive_dir / f"sera-{stamp}.db")
+            except Exception:
+                pass
+
+        if sensor_days > 0 or event_days > 0 or actuator_days > 0:
+            conn = sqlite3.connect(DB_PATH)
+            cur = conn.cursor()
+            if sensor_days > 0:
+                cutoff = now - (sensor_days * 86400)
+                cur.execute("DELETE FROM sensor_log WHERE ts < ?", (cutoff,))
+                summary["sensor_log"] = int(cur.rowcount or 0)
+            if event_days > 0:
+                cutoff = now - (event_days * 86400)
+                cur.execute("DELETE FROM event_log WHERE ts < ?", (cutoff,))
+                summary["event_log"] = int(cur.rowcount or 0)
+            if actuator_days > 0:
+                cur.execute("DELETE FROM actuator_log WHERE ts < datetime('now', ?)", (f"-{actuator_days} days",))
+                summary["actuator_log"] = int(cur.rowcount or 0)
+            conn.commit()
+            conn.close()
+
+        if sensor_days > 0:
+            cutoff_date = datetime.utcnow().date() - timedelta(days=sensor_days)
+            for path in SENSOR_CSV_LOG_DIR.glob("sensor_log_*.csv"):
+                m = re.search(r"sensor_log_(\\d{4}-\\d{2}-\\d{2})\\.csv$", path.name)
+                if not m:
+                    continue
+                try:
+                    file_date = datetime.strptime(m.group(1), "%Y-%m-%d").date()
+                except ValueError:
+                    continue
+                if file_date >= cutoff_date:
+                    continue
+                try:
+                    if archive_enabled:
+                        import shutil
+
+                        shutil.move(str(path), str(archive_dir / path.name))
+                    else:
+                        path.unlink(missing_ok=True)
+                    summary["csv_files"] += 1
+                except Exception:
+                    continue
+
+        with self.lock:
+            self.last_cleanup_ts = time.time()
+        log_event("maintenance", "info", "Retention cleanup completed", summary)
 
 
 class AppState:
@@ -1600,6 +1839,31 @@ class AppState:
 app = Flask(__name__)
 backend = GPIOBackend()
 channel_config = []
+
+
+def _deep_merge_dict(base: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, Any]:
+    merged: Dict[str, Any] = dict(base)
+    for key, value in (updates or {}).items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge_dict(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _write_json_atomic(path: Path, payload: Any) -> None:
+    path.parent.mkdir(exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp_path, path)
+
+
+def _load_json_or_none(path: Path) -> Optional[Any]:
+    try:
+        with path.open(encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 
 def load_channel_config() -> List[Dict[str, Any]]:
@@ -1698,8 +1962,7 @@ def load_channel_config() -> List[Dict[str, Any]]:
     ]
     if CHANNEL_CONFIG_PATH.exists():
         try:
-            with CHANNEL_CONFIG_PATH.open() as f:
-                data = json.load(f)
+            data = _load_json_or_none(CHANNEL_CONFIG_PATH)
             current = normalize(data if isinstance(data, list) else [])
         except Exception:
             current = normalize([])
@@ -1713,12 +1976,10 @@ def load_channel_config() -> List[Dict[str, Any]]:
                 changed = True
         if changed:
             CONFIG_DIR.mkdir(exist_ok=True)
-            with CHANNEL_CONFIG_PATH.open("w") as f:
-                json.dump(merged, f, indent=2)
+            _write_json_atomic(CHANNEL_CONFIG_PATH, merged)
         return merged
     CONFIG_DIR.mkdir(exist_ok=True)
-    with CHANNEL_CONFIG_PATH.open("w") as f:
-        json.dump(default_channels, f, indent=2)
+    _write_json_atomic(CHANNEL_CONFIG_PATH, default_channels)
     return normalize(default_channels)
 
 
@@ -1740,17 +2001,286 @@ def load_sensors_config() -> Dict[str, Any]:
     }
     if SENSORS_CONFIG_PATH.exists():
         try:
-            with SENSORS_CONFIG_PATH.open() as f:
-                data = json.load(f)
+            data = _load_json_or_none(SENSORS_CONFIG_PATH)
             merged = dict(defaults)
             merged.update(data or {})
             return merged
         except Exception:
             return defaults
     CONFIG_DIR.mkdir(exist_ok=True)
-    with SENSORS_CONFIG_PATH.open("w") as f:
-        json.dump(defaults, f, indent=2)
+    _write_json_atomic(SENSORS_CONFIG_PATH, defaults)
     return defaults
+
+
+def load_notifications_config() -> Dict[str, Any]:
+    defaults = dict(DEFAULT_NOTIFICATIONS)
+    if NOTIFICATIONS_CONFIG_PATH.exists():
+        data = _load_json_or_none(NOTIFICATIONS_CONFIG_PATH)
+        if isinstance(data, dict):
+            merged = dict(defaults)
+            merged.update(data)
+            return merged
+        return defaults
+    _write_json_atomic(NOTIFICATIONS_CONFIG_PATH, defaults)
+    return defaults
+
+
+def load_retention_config() -> Dict[str, Any]:
+    defaults = dict(DEFAULT_RETENTION)
+    if RETENTION_CONFIG_PATH.exists():
+        data = _load_json_or_none(RETENTION_CONFIG_PATH)
+        if isinstance(data, dict):
+            merged = dict(defaults)
+            merged.update(data)
+            return merged
+        return defaults
+    _write_json_atomic(RETENTION_CONFIG_PATH, defaults)
+    return defaults
+
+
+def load_panel_config() -> Dict[str, Any]:
+    defaults: Dict[str, Any] = {
+        "limits": dict(DEFAULT_LIMITS),
+        "automation": dict(DEFAULT_AUTOMATION),
+        "alerts": dict(DEFAULT_ALERTS),
+    }
+    if PANEL_CONFIG_PATH.exists():
+        data = _load_json_or_none(PANEL_CONFIG_PATH)
+        if isinstance(data, dict):
+            merged = dict(defaults)
+            merged["limits"] = _deep_merge_dict(defaults["limits"], data.get("limits") or {})
+            merged["automation"] = _deep_merge_dict(defaults["automation"], data.get("automation") or {})
+            merged["alerts"] = _deep_merge_dict(defaults["alerts"], data.get("alerts") or {})
+            return merged
+        return defaults
+    _write_json_atomic(PANEL_CONFIG_PATH, defaults)
+    return defaults
+
+
+def _is_hhmm(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    try:
+        _parse_hhmm(value)
+        return True
+    except Exception:
+        return False
+
+
+def _is_hex_addr(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    value = value.strip()
+    if not value.lower().startswith("0x"):
+        return False
+    try:
+        int(value, 16)
+        return True
+    except ValueError:
+        return False
+
+
+def validate_channels_payload(channels: Any) -> List[str]:
+    errors: List[str] = []
+    if not isinstance(channels, list):
+        return ["channels must be a list"]
+
+    seen_names: set[str] = set()
+    seen_pins: set[int] = set()
+    for idx, chan in enumerate(channels):
+        if not isinstance(chan, dict):
+            errors.append(f"channels[{idx}] must be an object")
+            continue
+        name = chan.get("name")
+        if not isinstance(name, str) or not name.strip():
+            errors.append(f"channels[{idx}].name is required")
+        else:
+            upper = name.strip().upper()
+            if upper in seen_names:
+                errors.append(f"channels[{idx}].name duplicate: {upper}")
+            seen_names.add(upper)
+        gpio_pin = chan.get("gpio_pin")
+        if not isinstance(gpio_pin, int):
+            errors.append(f"channels[{idx}].gpio_pin must be int")
+        else:
+            if gpio_pin in seen_pins:
+                errors.append(f"channels[{idx}].gpio_pin duplicate: {gpio_pin}")
+            seen_pins.add(gpio_pin)
+        if not isinstance(chan.get("active_low"), bool):
+            errors.append(f"channels[{idx}].active_low must be bool")
+    return errors
+
+
+def validate_sensors_payload(sensors: Any) -> List[str]:
+    errors: List[str] = []
+    if not isinstance(sensors, dict):
+        return ["sensors must be an object"]
+    for key in ("bh1750_addr", "ads1115_addr", "lcd_addr"):
+        if key in sensors and not _is_hex_addr(sensors.get(key)):
+            errors.append(f"sensors.{key} must be hex string like 0x27")
+    if "dht22_gpio" in sensors and not isinstance(sensors.get("dht22_gpio"), int):
+        errors.append("sensors.dht22_gpio must be int")
+    if "ds18b20_enabled" in sensors and not isinstance(sensors.get("ds18b20_enabled"), bool):
+        errors.append("sensors.ds18b20_enabled must be bool")
+    if "lcd_enabled" in sensors and not isinstance(sensors.get("lcd_enabled"), bool):
+        errors.append("sensors.lcd_enabled must be bool")
+    if "lcd_rows" in sensors and not isinstance(sensors.get("lcd_rows"), int):
+        errors.append("sensors.lcd_rows must be int")
+    if "lcd_lines" in sensors and not isinstance(sensors.get("lcd_lines"), list):
+        errors.append("sensors.lcd_lines must be list")
+    if isinstance(sensors.get("lcd_rows"), int) and isinstance(sensors.get("lcd_lines"), list):
+        rows = int(sensors.get("lcd_rows") or 0)
+        lines = sensors.get("lcd_lines") or []
+        if rows > 0 and len(lines) != rows:
+            errors.append(f"sensors.lcd_lines length must be {rows}")
+    return errors
+
+
+def validate_notifications_payload(cfg: Any) -> List[str]:
+    errors: List[str] = []
+    if not isinstance(cfg, dict):
+        return ["notifications must be an object"]
+    level = cfg.get("level")
+    if level is not None and str(level).lower() not in ("debug", "info", "warning", "error"):
+        errors.append("notifications.level must be one of debug|info|warning|error")
+    for key in ("enabled", "telegram_enabled", "email_enabled", "allow_simulation"):
+        if key in cfg and not isinstance(cfg.get(key), bool):
+            errors.append(f"notifications.{key} must be bool")
+    if "cooldown_seconds" in cfg:
+        try:
+            value = int(cfg.get("cooldown_seconds") or 0)
+            if value < 0:
+                errors.append("notifications.cooldown_seconds must be >= 0")
+        except (TypeError, ValueError):
+            errors.append("notifications.cooldown_seconds must be int")
+    return errors
+
+
+def validate_retention_payload(cfg: Any) -> List[str]:
+    errors: List[str] = []
+    if not isinstance(cfg, dict):
+        return ["retention must be an object"]
+    for key in ("sensor_log_days", "event_log_days", "actuator_log_days"):
+        if key in cfg:
+            try:
+                value = int(cfg.get(key) or 0)
+                if value < 0:
+                    errors.append(f"retention.{key} must be >= 0")
+            except (TypeError, ValueError):
+                errors.append(f"retention.{key} must be int")
+    if "cleanup_interval_hours" in cfg:
+        try:
+            value = int(cfg.get("cleanup_interval_hours") or 24)
+            if value < 1:
+                errors.append("retention.cleanup_interval_hours must be >= 1")
+        except (TypeError, ValueError):
+            errors.append("retention.cleanup_interval_hours must be int")
+    if "archive_enabled" in cfg and not isinstance(cfg.get("archive_enabled"), bool):
+        errors.append("retention.archive_enabled must be bool")
+    if "archive_dir" in cfg and not isinstance(cfg.get("archive_dir"), str):
+        errors.append("retention.archive_dir must be string")
+    return errors
+
+
+def validate_automation_payload(cfg: Any) -> List[str]:
+    if not isinstance(cfg, dict):
+        return ["automation must be an object"]
+    errors: List[str] = []
+    for key in ("window_start", "window_end", "reset_time", "fan_night_start", "fan_night_end", "heater_night_start", "heater_night_end", "pump_window_start", "pump_window_end"):
+        if key in cfg and not _is_hhmm(cfg.get(key)):
+            errors.append(f"automation.{key} must be HH:MM")
+    return errors
+
+
+def validate_limits_payload(cfg: Any) -> List[str]:
+    if not isinstance(cfg, dict):
+        return ["limits must be an object"]
+    errors: List[str] = []
+    int_keys = {"pump_max_seconds", "pump_cooldown_seconds", "heater_max_seconds", "energy_kwh_threshold"}
+    float_keys = {"heater_cutoff_temp", "energy_kwh_low", "energy_kwh_high"}
+    for key in DEFAULT_LIMITS:
+        if key not in cfg:
+            continue
+        raw = cfg.get(key)
+        if key in float_keys:
+            try:
+                value = float(raw)
+                if value < 0:
+                    errors.append(f"limits.{key} must be >= 0")
+            except (TypeError, ValueError):
+                errors.append(f"limits.{key} must be number")
+        elif key in int_keys:
+            try:
+                value = int(raw)
+                if key.endswith("_seconds") and value < 0:
+                    errors.append(f"limits.{key} must be >= 0")
+                if key == "pump_max_seconds" and value < 1:
+                    errors.append("limits.pump_max_seconds must be >= 1")
+                if key == "heater_max_seconds" and value < 1:
+                    errors.append("limits.heater_max_seconds must be >= 1")
+            except (TypeError, ValueError):
+                errors.append(f"limits.{key} must be int")
+        else:
+            errors.append(f"limits.{key} unexpected")
+    return errors
+
+
+def validate_alerts_payload(cfg: Any) -> List[str]:
+    if not isinstance(cfg, dict):
+        return ["alerts must be an object"]
+    errors: List[str] = []
+    for key in DEFAULT_ALERTS:
+        if key not in cfg:
+            continue
+        raw = cfg.get(key)
+        if key == "sensor_offline_minutes":
+            try:
+                value = int(raw)
+                if value < 0:
+                    errors.append("alerts.sensor_offline_minutes must be >= 0")
+            except (TypeError, ValueError):
+                errors.append("alerts.sensor_offline_minutes must be int")
+        else:
+            try:
+                value = float(raw)
+                if value < 0:
+                    errors.append(f"alerts.{key} must be >= 0")
+            except (TypeError, ValueError):
+                errors.append(f"alerts.{key} must be number")
+    return errors
+
+
+def save_panel_config_updates(limits: Optional[Dict[str, Any]] = None, automation: Optional[Dict[str, Any]] = None, alerts_cfg: Optional[Dict[str, Any]] = None) -> None:
+    global panel_config
+    current = dict(panel_config or load_panel_config())
+    if limits:
+        current["limits"] = _deep_merge_dict(current.get("limits") or {}, limits)
+    if automation:
+        current["automation"] = _deep_merge_dict(current.get("automation") or {}, automation)
+    if alerts_cfg:
+        current["alerts"] = _deep_merge_dict(current.get("alerts") or {}, alerts_cfg)
+    _write_json_atomic(PANEL_CONFIG_PATH, current)
+    panel_config = current
+
+
+def save_notifications_config_updates(cfg: Dict[str, Any]) -> None:
+    global notifications_config
+    merged = dict(DEFAULT_NOTIFICATIONS)
+    merged.update(notifications_config or {})
+    merged.update(cfg or {})
+    _write_json_atomic(NOTIFICATIONS_CONFIG_PATH, merged)
+    notifications_config = merged
+    notifications.update_config(merged)
+
+
+def save_retention_config_updates(cfg: Dict[str, Any]) -> None:
+    global retention_config
+    merged = dict(DEFAULT_RETENTION)
+    merged.update(retention_config or {})
+    merged.update(cfg or {})
+    _write_json_atomic(RETENTION_CONFIG_PATH, merged)
+    retention_config = merged
+    retention_manager.update_config(merged)
 
 
 def load_updates() -> List[Dict[str, Any]]:
@@ -1767,27 +2297,33 @@ def load_updates() -> List[Dict[str, Any]]:
     ]
     if UPDATES_PATH.exists():
         try:
-            with UPDATES_PATH.open() as f:
-                data = json.load(f)
+            data = _load_json_or_none(UPDATES_PATH)
             if isinstance(data, list):
                 return data
         except Exception:
             pass
     CONFIG_DIR.mkdir(exist_ok=True)
-    with UPDATES_PATH.open("w") as f:
-        json.dump(defaults, f, indent=2)
+    _write_json_atomic(UPDATES_PATH, defaults)
     return defaults
 
 
 channel_config = load_channel_config()
 sensors_config = load_sensors_config()
+notifications_config = load_notifications_config()
+retention_config = load_retention_config()
+panel_config = load_panel_config()
 actuator_manager = ActuatorManager(backend, channel_config)
 sensor_manager = SensorManager()
 sensor_manager.reload_config(sensors_config)
 automation_engine = AutomationEngine(actuator_manager, sensor_manager)
-alerts = AlertManager()
+notifications = NotificationManager(notifications_config)
+alerts = AlertManager(notifications)
 app_state = AppState(actuator_manager, sensor_manager, automation_engine, alerts)
 lcd_manager = LCDManager(sensors_config)
+retention_manager = RetentionManager(retention_config)
+app_state.update_limits(panel_config.get("limits") or {})
+app_state.update_alerts(panel_config.get("alerts") or {})
+automation_engine.config.update(panel_config.get("automation") or {})
 
 
 # Database
@@ -2450,9 +2986,19 @@ def automation_loop() -> None:
         time.sleep(3)
 
 
+def retention_loop() -> None:
+    while True:
+        try:
+            retention_manager.cleanup_if_due()
+        except Exception as exc:
+            log_event("maintenance", "warning", f"Retention cleanup error: {exc}", None)
+        time.sleep(60)
+
+
 if not DISABLE_BACKGROUND_LOOPS:
     threading.Thread(target=sensor_loop, daemon=True).start()
     threading.Thread(target=automation_loop, daemon=True).start()
+    threading.Thread(target=retention_loop, daemon=True).start()
 
 
 # Routes
@@ -2539,6 +3085,11 @@ def reports_weekly_page() -> Any:
 
 
 def api_status_payload(readings: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    if readings is None and DISABLE_BACKGROUND_LOOPS and sensor_manager.simulation:
+        try:
+            readings = sensor_manager.read_all()
+        except Exception:
+            readings = None
     latest = sensor_manager.latest()
     if readings is None:
         readings = dict(latest.get("readings", {}))
@@ -2581,6 +3132,8 @@ def api_status_payload(readings: Optional[Dict[str, Any]] = None) -> Dict[str, A
         "limits": app_state.limits,
         "automation": automation_engine.config,
         "lcd": lcd_manager.status(),
+        "notifications": notifications.public_status(),
+        "retention": retention_manager.public_status(),
     }
 
 
@@ -2593,6 +3146,29 @@ def api_status() -> Any:
 @app.route("/api/updates")
 def api_updates() -> Any:
     return jsonify({"items": load_updates()})
+
+
+@app.route("/api/notifications/test", methods=["POST"])
+def api_notifications_test() -> Any:
+    admin_error = require_admin()
+    if admin_error:
+        return admin_error
+    payload = request.get_json(force=True, silent=True) or {}
+    message = str(payload.get("message") or "")
+    result = notifications.send_test(message)
+    return jsonify({"ok": True, **result})
+
+
+@app.route("/api/maintenance/retention_cleanup", methods=["POST"])
+def api_retention_cleanup() -> Any:
+    admin_error = require_admin()
+    if admin_error:
+        return admin_error
+    try:
+        retention_manager.cleanup_now()
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    return jsonify({"ok": True})
 
 
 @app.route("/api/sensor_log")
@@ -3038,6 +3614,8 @@ def api_config() -> Any:
             "alerts_config": app_state.get_alerts_config(),
             "safe_mode": app_state.safe_mode,
             "sensors": sensors_config,
+            "notifications": dict(notifications_config),
+            "retention": dict(retention_config),
         })
     payload = request.get_json(force=True, silent=True) or {}
     channels = payload.get("channels")
@@ -3046,24 +3624,56 @@ def api_config() -> Any:
     alerts_config = payload.get("alerts")
     sensors_payload = payload.get("sensors")
     safe_mode = payload.get("safe_mode")
+    notifications_payload = payload.get("notifications")
+    retention_payload = payload.get("retention")
     if channels:
-        CONFIG_DIR.mkdir(exist_ok=True)
-        with CHANNEL_CONFIG_PATH.open("w") as f:
-            json.dump(channels, f, indent=2)
-        actuator_manager.reload_channels(channels)
+        errors = validate_channels_payload(channels)
+        if errors:
+            return jsonify({"error": "invalid channels", "details": errors}), 400
+        normalized: List[Dict[str, Any]] = []
+        for chan in channels:
+            entry = dict(chan)
+            if isinstance(entry.get("name"), str):
+                entry["name"] = entry["name"].strip().upper()
+            normalized.append(entry)
+        _write_json_atomic(CHANNEL_CONFIG_PATH, normalized)
+        actuator_manager.reload_channels(normalized)
     if limits:
+        errors = validate_limits_payload(limits)
+        if errors:
+            return jsonify({"error": "invalid limits", "details": errors}), 400
         app_state.update_limits(limits)
+        save_panel_config_updates(limits=app_state.limits)
     if automation:
+        errors = validate_automation_payload(automation)
+        if errors:
+            return jsonify({"error": "invalid automation", "details": errors}), 400
         automation_engine.config.update(automation)
+        save_panel_config_updates(automation=automation_engine.config)
     if alerts_config:
+        errors = validate_alerts_payload(alerts_config)
+        if errors:
+            return jsonify({"error": "invalid alerts", "details": errors}), 400
         app_state.update_alerts(alerts_config)
+        save_panel_config_updates(alerts_cfg=app_state.get_alerts_config())
     if sensors_payload:
-        CONFIG_DIR.mkdir(exist_ok=True)
+        errors = validate_sensors_payload(sensors_payload)
+        if errors:
+            return jsonify({"error": "invalid sensors", "details": errors}), 400
         sensors_config.update(sensors_payload)
-        with SENSORS_CONFIG_PATH.open("w") as f:
-            json.dump(sensors_config, f, indent=2)
+        _write_json_atomic(SENSORS_CONFIG_PATH, sensors_config)
         sensor_manager.reload_config(sensors_config)
         lcd_manager.update_config(sensors_config)
+    if notifications_payload:
+        errors = validate_notifications_payload(notifications_payload)
+        if errors:
+            return jsonify({"error": "invalid notifications", "details": errors}), 400
+        save_notifications_config_updates(notifications_payload)
+    if retention_payload:
+        errors = validate_retention_payload(retention_payload)
+        if errors:
+            return jsonify({"error": "invalid retention", "details": errors}), 400
+        save_retention_config_updates(retention_payload)
     if safe_mode is not None:
         app_state.toggle_safe_mode(bool(safe_mode))
     actuator_manager.set_all_off("config_update")
@@ -3085,12 +3695,38 @@ def api_settings() -> Any:
     limits = payload.get("limits", {})
     automation = payload.get("automation", {})
     alerts_config = payload.get("alerts", {})
+    notifications_payload = payload.get("notifications")
+    retention_payload = payload.get("retention")
     if safe_mode is not None:
         app_state.toggle_safe_mode(bool(safe_mode))
-    app_state.update_limits(limits)
-    automation_engine.config.update(automation)
+    if limits:
+        errors = validate_limits_payload(limits)
+        if errors:
+            return jsonify({"error": "invalid limits", "details": errors}), 400
+        app_state.update_limits(limits)
+        save_panel_config_updates(limits=app_state.limits)
+    if automation:
+        errors = validate_automation_payload(automation)
+        if errors:
+            return jsonify({"error": "invalid automation", "details": errors}), 400
+        automation_engine.config.update(automation)
+        save_panel_config_updates(automation=automation_engine.config)
     if alerts_config:
+        errors = validate_alerts_payload(alerts_config)
+        if errors:
+            return jsonify({"error": "invalid alerts", "details": errors}), 400
         app_state.update_alerts(alerts_config)
+        save_panel_config_updates(alerts_cfg=app_state.get_alerts_config())
+    if notifications_payload:
+        errors = validate_notifications_payload(notifications_payload)
+        if errors:
+            return jsonify({"error": "invalid notifications", "details": errors}), 400
+        save_notifications_config_updates(notifications_payload)
+    if retention_payload:
+        errors = validate_retention_payload(retention_payload)
+        if errors:
+            return jsonify({"error": "invalid retention", "details": errors}), 400
+        save_retention_config_updates(retention_payload)
     return jsonify({"ok": True})
 
 

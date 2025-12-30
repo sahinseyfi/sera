@@ -68,14 +68,16 @@
   <div class="accordion-item">
     <h2 class="accordion-header" id="hAyarlar">
       <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cAyarlar" aria-expanded="false" aria-controls="cAyarlar">
-        Ayarlar (SAFE MODE, Limitler, Otomasyon)
+        Ayarlar (SAFE MODE, Limitler, Otomasyon, Bildirimler)
       </button>
     </h2>
     <div id="cAyarlar" class="accordion-collapse collapse" aria-labelledby="hAyarlar" data-bs-parent="#faqAccordion">
       <div class="accordion-body small">
         <p class="mb-2"><strong>Admin Token nedir?</strong><br><code>ADMIN_TOKEN</code> ortam değişkeni tanımlıysa, admin işlemleri için tarayıcıdan token girmen gerekir. Token yoksa admin işlemleri sadece yerel ağdan (LAN) kabul edilir.</p>
         <p class="mb-2"><strong>Limitler ne işe yarar?</strong><br>Pompa/ısıtıcı gibi riskli çıkışlara süre ve soğuma (cooldown) sınırı koyar. Isıtıcı için ayrıca “üst limit” sıcaklıkta otomatik kesme uygulanır.</p>
-        <p class="mb-0"><strong>Otomasyon nasıl çalışır?</strong><br>Lux/ısıtıcı/pompa otomasyonları, pencere saatleri, hedef süreler ve “override/blok/min kapalı” kurallarıyla çalışır. Detaylar Dashboard’daki “Otomasyon Durumu” özetinde görülür.</p>
+        <p class="mb-2"><strong>Otomasyon nasıl çalışır?</strong><br>Lux/ısıtıcı/pompa otomasyonları, pencere saatleri, hedef süreler ve “override/blok/min kapalı” kurallarıyla çalışır. Detaylar Dashboard’daki “Otomasyon Durumu” özetinde görülür.</p>
+        <p class="mb-2"><strong>Bildirimler (Telegram) nasıl çalışır?</strong><br>Uyarı/hata mesajları Telegram’a gönderilebilir. Tokenlar config dosyasına yazılmaz; <code>TELEGRAM_BOT_TOKEN</code> ve <code>TELEGRAM_CHAT_ID</code> env var ile verilir. Ayarlar sayfasından seviye/cooldown/test mesajı yönetilir.</p>
+        <p class="mb-0"><strong>Veri saklama (retention) ne yapar?</strong><br>Logların kaç gün saklanacağını belirler. <strong>0 gün</strong> seçilirse silme kapalıdır. Arşiv açıksa temizlikten önce DB/CSV arşive kopyalanır.</p>
       </div>
     </div>
   </div>
@@ -126,4 +128,3 @@
 </div>
 
 {% endblock %}
-

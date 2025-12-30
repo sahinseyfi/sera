@@ -1,5 +1,27 @@
 [
   {
+    "date": "2025-12-30",
+    "title": "Bildirimler ve veri saklama ayarları eklendi",
+    "summary": "Uyarıları Telegram’a gönderebilir, logların ne kadar saklanacağını panelden yönetebilirsin.",
+    "details": [
+      "Ayarlar sayfasına Telegram bildirim kontrolleri eklendi (test mesajı dahil).",
+      "Veri saklama/temizlik ayarları eklendi (0 gün = silme kapalı).",
+      "Limit/otomasyon/uyarı eşikleri artık kalıcı olarak kaydedilir.",
+      "Mobil kullanım için alt hızlı menü ve aktif sayfa vurgusu eklendi.",
+      "Acil durdurma/temizlik/donanım kaydet gibi riskli aksiyonlara YES onayı eklendi."
+    ]
+  },
+  {
+    "date": "2025-12-30",
+    "title": "Ayar değişiklikleri daha güvenli hale getirildi",
+    "summary": "Konfigürasyon dosyalarında olası hataları önceden yakalayan kontrollerle daha sorunsuz güncelleme yapabilirsin.",
+    "details": [
+      "Ayar dosyaları için hızlı doğrulama eklendi (yanlış ayarı erken yakalar).",
+      "Geliştirme ve doğrulama adımları tek komutla çalıştırılabilir hale getirildi.",
+      "Değişiklik checklist’leri ile riskli adımlar daha kontrollü ilerler."
+    ]
+  },
+  {
     "date": "2025-12-29",
     "title": "Günlük ve haftalık raporlar eklendi",
     "summary": "Sera verilerini anlaşılır özetler ve eğitici kartlarla görebileceğin yeni rapor sayfaları hazır.",

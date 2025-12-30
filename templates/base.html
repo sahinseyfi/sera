@@ -80,7 +80,7 @@
       background: rgba(14, 165, 164, 0.08);
     }
     @media (max-width: 768px) {
-      body { padding: 0 6px; }
+      body { padding: 0 6px 88px; }
       .navbar .d-flex.flex-column.align-items-end { align-items: flex-start !important; }
       .hero { padding: 1rem; }
       .hero .d-flex { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
@@ -88,6 +88,38 @@
       .btn { font-size: 14px; }
       #lcdTokenButtons button { flex: 1 1 45%; }
       .lcd-preview { font-size: 14px; }
+    }
+    .mobile-tabbar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 10px 10px;
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      background: rgba(248, 250, 252, 0.94);
+      border-top: 1px solid var(--border);
+      backdrop-filter: blur(6px);
+      z-index: 1030;
+    }
+    .mobile-tabbar a {
+      flex: 1 1 0;
+      text-align: center;
+      text-decoration: none;
+      padding: 10px 8px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text-strong);
+      font-weight: 600;
+      font-size: 13px;
+      line-height: 1;
+    }
+    .mobile-tabbar a.active {
+      border-color: rgba(14, 165, 164, 0.55);
+      background: rgba(14, 165, 164, 0.12);
+      color: var(--accent-strong);
     }
   </style>
 </head>
@@ -113,6 +145,7 @@
         </ul>
         <div class="d-flex flex-column align-items-end gap-1">
           <span id="safeModeBadge" class="pill text-uppercase small">SAFE MODE</span>
+          <small class="text-secondary" id="connectionStatus">Bağlantı: --</small>
           <small class="text-secondary" id="lastUpdated">---</small>
           <small class="text-secondary" id="dataAge">---</small>
         </div>
@@ -123,9 +156,31 @@
   <main class="container mb-5">
     {% block content %}{% endblock %}
   </main>
+  <div class="mobile-tabbar d-md-none">
+    <a href="/dashboard">Dashboard</a>
+    <a href="/control">Kontrol</a>
+    <a href="/settings">Ayarlar</a>
+    <a href="/logs">Loglar</a>
+  </div>
   <footer class="container pb-4 small">Momo & Nova Station · Raspberry Pi 4</footer>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
+      const normalize = (p) => {
+        const raw = String(p || '');
+        const noTrail = raw.length > 1 ? raw.replace(/\/+$/, '') : raw;
+        return noTrail || '/';
+      };
+      const path = normalize(window.location.pathname);
+      document.querySelectorAll('.navbar-nav .nav-link').forEach(el => {
+        const href = normalize(el.getAttribute('href'));
+        const match = href === '/reports/daily' ? path.startsWith('/reports') : path === href;
+        if (match) el.classList.add('active');
+      });
+      document.querySelectorAll('.mobile-tabbar a').forEach(el => {
+        const href = normalize(el.getAttribute('href'));
+        if (path === href) el.classList.add('active');
+      });
+
       if (!window.bootstrap) return;
       const triggers = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
       triggers.forEach(el => new bootstrap.Tooltip(el));

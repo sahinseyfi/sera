@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "reporting.json",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "SERA_LAT",
+    "SERA_LON",
+    "SERA_TZ",
+    "SERA_FACADE_AZIMUTH_NORTH_DEG",
+    "SERA_FACADE_TILT_DEG",
+    "BEGINNER_MODE_DEFAULT",
+    "ACTIVE_PROFILE",
+    "LUX_DAYLIGHT_THRESHOLD",
+    "LIGHT_TARGET_HOURS",
+    "TEMP_OK_MIN",
+    "TEMP_OK_MAX",
+    "TEMP_STRESS_COLD",
+    "TEMP_STRESS_HOT",
+    "TEMP_SPIKE_DELTA",
+    "VPD_OK_MIN",
+    "VPD_OK_MAX",
+    "GDD_BASE_C",
+    "DEWPOINT_MARGIN_HIGH_RISK_C",
+    "DEWPOINT_MARGIN_MED_RISK_C",
+    "PLANT_PROFILES"
+  ],
+  "properties": {
+    "SERA_LAT": { "type": "number" },
+    "SERA_LON": { "type": "number" },
+    "SERA_TZ": { "type": "string" },
+    "SERA_FACADE_AZIMUTH_NORTH_DEG": { "type": "number" },
+    "SERA_FACADE_TILT_DEG": { "type": "number" },
+    "BEGINNER_MODE_DEFAULT": { "type": "boolean" },
+    "ACTIVE_PROFILE": { "type": "string" },
+    "LUX_DAYLIGHT_THRESHOLD": { "type": "number" },
+    "LIGHT_TARGET_HOURS": { "type": "number" },
+    "TEMP_OK_MIN": { "type": "number" },
+    "TEMP_OK_MAX": { "type": "number" },
+    "TEMP_STRESS_COLD": { "type": "number" },
+    "TEMP_STRESS_HOT": { "type": "number" },
+    "TEMP_SPIKE_DELTA": { "type": "number" },
+    "VPD_OK_MIN": { "type": "number" },
+    "VPD_OK_MAX": { "type": "number" },
+    "GDD_BASE_C": { "type": "number" },
+    "DEWPOINT_MARGIN_HIGH_RISK_C": { "type": "number" },
+    "DEWPOINT_MARGIN_MED_RISK_C": { "type": "number" },
+    "PLANT_PROFILES": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "label",
+          "description",
+          "TEMP_OK_MIN",
+          "TEMP_OK_MAX",
+          "TEMP_STRESS_COLD",
+          "TEMP_STRESS_HOT",
+          "VPD_OK_MIN",
+          "VPD_OK_MAX",
+          "GDD_BASE_C",
+          "LUX_DAYLIGHT_THRESHOLD"
+        ],
+        "properties": {
+          "label": { "type": "string" },
+          "description": { "type": "string" },
+          "TEMP_OK_MIN": { "type": "number" },
+          "TEMP_OK_MAX": { "type": "number" },
+          "TEMP_STRESS_COLD": { "type": "number" },
+          "TEMP_STRESS_HOT": { "type": "number" },
+          "VPD_OK_MIN": { "type": "number" },
+          "VPD_OK_MAX": { "type": "number" },
+          "GDD_BASE_C": { "type": "number" },
+          "LUX_DAYLIGHT_THRESHOLD": { "type": "number" }
+        }
+      }
+    }
+  }
+}
+

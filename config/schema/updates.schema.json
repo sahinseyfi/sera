@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "updates.json",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["date", "title", "summary", "details"],
+    "properties": {
+      "date": { "type": "string" },
+      "title": { "type": "string" },
+      "summary": { "type": "string" },
+      "details": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  }
+}
+

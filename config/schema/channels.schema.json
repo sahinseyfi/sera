@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "channels.json",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["name", "gpio_pin", "active_low"],
+    "properties": {
+      "name": { "type": "string", "minLength": 1 },
+      "gpio_pin": { "type": "integer" },
+      "active_low": { "type": "boolean" },
+      "description": { "type": "string" },
+      "role": { "type": "string" },
+      "power_w": { "type": "number" },
+      "quantity": { "type": "integer", "minimum": 0 },
+      "voltage_v": { "type": "number" },
+      "notes": { "type": "string" }
+    }
+  }
+}
+

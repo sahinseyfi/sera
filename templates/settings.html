@@ -1,16 +1,17 @@
 {% extends 'base.html' %}
 {% block content %}
+<div id="top"></div>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <p class="text-secondary mb-1">Sistem Ayarları</p>
-    <h2 class="mb-0">SAFE MODE, Limitler, Otomasyon</h2>
+    <h2 class="mb-0">SAFE MODE, Limitler, Otomasyon, Bildirimler</h2>
   </div>
 </div>
 
 <div class="card mb-3"><div class="card-body">
   <h6 class="mb-1">Bu sayfa ne işe yarar?</h6>
   <div class="small text-secondary">
-    Güvenlik modunu (SAFE MODE), pompa/ısıtıcı limitlerini ve otomasyon kurallarını buradan yönetirsin.
+    Güvenlik modunu (SAFE MODE), pompa/ısıtıcı limitlerini, otomasyon kurallarını ve bildirim/veri saklama ayarlarını buradan yönetirsin.
     Admin Token gerekiyorsa ilk kutudan gir. Detay: <a href="/help#hAyarlar">Yardım/SSS</a>.
   </div>
 </div></div>
@@ -29,7 +30,7 @@
 
 <div class="row g-3">
   <div class="col-md-6">
-    <div class="card h-100"><div class="card-body">
+    <div class="card h-100" id="secSafeMode"><div class="card-body">
       <h6>SAFE MODE</h6>
       <p class="text-secondary small">SAFE MODE açıkken kontrol endpointleri kilitli, sadece izleme.</p>
       <div class="form-check form-switch">
@@ -42,7 +43,7 @@
     </div></div>
   </div>
   <div class="col-md-6">
-    <div class="card h-100"><div class="card-body">
+    <div class="card h-100" id="secLimits"><div class="card-body">
       <h6>Limitler</h6>
       <div class="row g-2">
         <div class="col-12">
@@ -80,7 +81,26 @@
   <button class="btn btn-primary" id="saveSettings" type="button">Kaydet</button>
 </div>
 
-<div class="card mt-3"><div class="card-body">
+<div class="card mb-3"><div class="card-body">
+  <label class="form-label">Bölüme git</label>
+  <select class="form-select" id="settingsSectionJump">
+    <option value="" selected>Seç...</option>
+    <option value="secSafeMode">SAFE MODE</option>
+    <option value="secLimits">Limitler</option>
+    <option value="secAlerts">Uyarı Eşikleri</option>
+    <option value="secEnergy">Enerji Bedeli</option>
+    <option value="secLuxAutomation">Lux Otomasyonu</option>
+    <option value="secHeaterAutomation">Isıtıcı Otomasyonu</option>
+    <option value="secPumpAutomation">Pompa Otomasyonu</option>
+    <option value="secSoilCalibration">Toprak Kalibrasyonu</option>
+    <option value="secFanAutomation">Fan Otomasyonu</option>
+    <option value="secNotifications">Bildirimler</option>
+    <option value="secRetention">Veri Saklama</option>
+  </select>
+  <div class="form-text">Uzun sayfada hızlı gezinmek için.</div>
+</div></div>
+
+<div class="card mt-3" id="secAlerts"><div class="card-body">
   <h6>Uyarı Eşikleri</h6>
   <div class="row g-2">
     <div class="col-md-3">
@@ -123,7 +143,7 @@
   </div>
 </div></div>
 
-<div class="card mt-3"><div class="card-body">
+<div class="card mt-3" id="secEnergy"><div class="card-body">
   <h6>Enerji Bedeli (TL/kWh)</h6>
   <div class="row g-2">
     <div class="col-md-4">
@@ -148,7 +168,7 @@
   <div class="form-text">Toplam tüketim eşiği aştığında yüksek kademe uygulanır.</div>
 </div></div>
 
-<div class="card mt-3"><div class="card-body">
+<div class="card mt-3" id="secLuxAutomation"><div class="card-body">
   <h6>Lux Otomasyonu</h6>
   <div class="row g-2">
     <div class="col-md-3">
@@ -222,7 +242,7 @@
   </div>
 </div></div>
 
-<div class="card mt-3"><div class="card-body">
+<div class="card mt-3" id="secHeaterAutomation"><div class="card-body">
   <h6>Isıtıcı Otomasyonu</h6>
   <div class="row g-2">
     <div class="col-md-3">
@@ -319,7 +339,7 @@
   </div>
 </div></div>
 
-<div class="card mt-3"><div class="card-body">
+<div class="card mt-3" id="secPumpAutomation"><div class="card-body">
   <h6>Pompa Otomasyonu</h6>
   <div class="row g-2">
     <div class="col-md-3">
@@ -390,7 +410,7 @@
   </div>
 </div></div>
 
-<div class="card mt-3"><div class="card-body">
+<div class="card mt-3" id="secSoilCalibration"><div class="card-body">
   <h6>Toprak Nem Kalibrasyonu</h6>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
@@ -453,7 +473,7 @@
   <div class="form-text">Kuru: sensör havada. Islak: suya/çok ıslak toprağa batır.</div>
 </div></div>
 
-<div class="card mt-3"><div class="card-body">
+<div class="card mt-3" id="secFanAutomation"><div class="card-body">
   <h6>Nem Fan Otomasyonu</h6>
   <div class="row g-2">
     <div class="col-md-3">
@@ -580,6 +600,128 @@
     </div>
   </div>
 </div></div>
+
+<div class="card mt-3" id="secNotifications"><div class="card-body">
+  <h6>Bildirimler (Telegram)</h6>
+  <p class="text-secondary small mb-2">
+    Uyarı ve hataları Telegram’a gönderebilir. Tokenlar config içinde tutulmaz; env var ile verilir: <code>TELEGRAM_BOT_TOKEN</code>, <code>TELEGRAM_CHAT_ID</code>.
+  </p>
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="notifyEnabled">
+        <label class="form-check-label" for="notifyEnabled">Bildirimler aktif</label>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Seviye
+        <span class="info-icon" data-bs-toggle="tooltip" title="Bu seviyenin altındaki uyarılar gönderilmez. Örn: warning seçilirse info gönderilmez.">?</span>
+      </label>
+      <select class="form-select" id="notifyLevel">
+        <option value="debug">debug</option>
+        <option value="info">info</option>
+        <option value="warning">warning</option>
+        <option value="error">error</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Cooldown (s)
+        <span class="info-icon" data-bs-toggle="tooltip" title="Aynı anda çok fazla mesaj gitmesini önlemek için minimum bekleme süresi. 0 = sınırsız.">?</span>
+      </label>
+      <input class="form-control" id="notifyCooldown" type="number" min="0" value="300">
+    </div>
+    <div class="col-md-3">
+      <small class="text-secondary d-block">Telegram yapılandırma</small>
+      <span class="pill" id="telegramConfigStatus">--</span>
+    </div>
+  </div>
+  <div class="row g-2 mt-2">
+    <div class="col-md-3">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="notifyTelegramEnabled">
+        <label class="form-check-label" for="notifyTelegramEnabled">Telegram aktif</label>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="notifyAllowSimulation">
+        <label class="form-check-label" for="notifyAllowSimulation">Simülasyonda da gönder</label>
+      </div>
+      <div class="form-text">SIMULATION_MODE’da test bildirimi atabilir.</div>
+    </div>
+    <div class="col-md-3">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="notifyEmailEnabled" disabled>
+        <label class="form-check-label" for="notifyEmailEnabled">Email (yakında)</label>
+      </div>
+    </div>
+  </div>
+  <div class="row g-2 mt-2 align-items-end">
+    <div class="col-md-8">
+      <label class="form-label">Test Mesajı</label>
+      <input class="form-control" id="notifyTestMessage" type="text" placeholder="İsteğe bağlı mesaj">
+      <small class="text-secondary" id="notifyTestResult"></small>
+    </div>
+    <div class="col-md-4">
+      <button class="btn btn-outline-secondary w-100" id="testNotificationBtn" type="button">Test Bildirimi Gönder</button>
+    </div>
+  </div>
+</div></div>
+
+<div class="card mt-3" id="secRetention"><div class="card-body">
+  <h6>Veri Saklama & Temizlik</h6>
+  <p class="text-secondary small mb-2">
+    <strong>0 gün</strong> = silme kapalı. Dikkat: silme geri alınamaz; istersen önce arşivi aç.
+  </p>
+  <div class="row g-2">
+    <div class="col-md-3">
+      <label class="form-label">Sensör log (gün)</label>
+      <input class="form-control" id="retentionSensorDays" type="number" min="0" value="0">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Olay log (gün)</label>
+      <input class="form-control" id="retentionEventDays" type="number" min="0" value="0">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Aktüatör log (gün)</label>
+      <input class="form-control" id="retentionActuatorDays" type="number" min="0" value="0">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Temizlik aralığı (saat)</label>
+      <input class="form-control" id="retentionIntervalHours" type="number" min="1" value="24">
+    </div>
+  </div>
+  <div class="row g-2 mt-2 align-items-end">
+    <div class="col-md-3">
+      <div class="form-check form-switch">
+        <input class="form-check-input" type="checkbox" role="switch" id="retentionArchiveEnabled">
+        <label class="form-check-label" for="retentionArchiveEnabled">Arşiv açık</label>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Arşiv klasörü</label>
+      <input class="form-control" id="retentionArchiveDir" type="text" value="data/archives">
+      <div class="form-text">Repo içinde bir klasör ver (örn: <code>data/archives</code>).</div>
+    </div>
+    <div class="col-md-3">
+      <small class="text-secondary d-block">Son temizlik</small>
+      <span class="pill" id="retentionLastCleanup">--</span>
+    </div>
+  </div>
+  <div class="row g-2 mt-2 align-items-end">
+    <div class="col-md-8">
+      <small class="text-secondary" id="retentionCleanupResult"></small>
+    </div>
+    <div class="col-md-4">
+      <button class="btn btn-outline-secondary w-100" id="runRetentionCleanupBtn" type="button">Temizliği Şimdi Çalıştır</button>
+    </div>
+  </div>
+</div></div>
+
+<div class="d-flex justify-content-between align-items-center mt-3 mb-3 d-md-none">
+  <small class="text-secondary" id="settingsSavedNoteBottom"></small>
+  <button class="btn btn-primary" id="saveSettingsBottom" type="button">Kaydet</button>
+</div>
 
 <script>window.initSettings && window.initSettings();</script>
 {% endblock %}

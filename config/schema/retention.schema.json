@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "retention.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sensor_log_days",
+    "event_log_days",
+    "actuator_log_days",
+    "archive_enabled",
+    "archive_dir",
+    "cleanup_interval_hours"
+  ],
+  "properties": {
+    "sensor_log_days": { "type": "integer", "minimum": 0 },
+    "event_log_days": { "type": "integer", "minimum": 0 },
+    "actuator_log_days": { "type": "integer", "minimum": 0 },
+    "archive_enabled": { "type": "boolean" },
+    "archive_dir": { "type": "string" },
+    "cleanup_interval_hours": { "type": "integer", "minimum": 1 }
+  }
+}
+

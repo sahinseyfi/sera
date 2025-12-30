@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "panel.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pump_max_seconds": { "type": "integer", "minimum": 1 },
+        "pump_cooldown_seconds": { "type": "integer", "minimum": 0 },
+        "heater_max_seconds": { "type": "integer", "minimum": 0 },
+        "heater_cutoff_temp": { "type": "number", "minimum": 0 },
+        "energy_kwh_low": { "type": "number", "minimum": 0 },
+        "energy_kwh_high": { "type": "number", "minimum": 0 },
+        "energy_kwh_threshold": { "type": "number", "minimum": 0 }
+      }
+    },
+    "alerts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sensor_offline_minutes": { "type": "integer", "minimum": 0 },
+        "temp_high_c": { "type": "number" },
+        "temp_low_c": { "type": "number" },
+        "hum_high_pct": { "type": "number" },
+        "hum_low_pct": { "type": "number" }
+      }
+    },
+    "automation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "lux_ok": { "type": "integer", "minimum": 0 },
+        "lux_max": { "type": "integer", "minimum": 0 },
+        "target_ok_minutes": { "type": "integer", "minimum": 0 },
+        "window_start": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+        "window_end": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+        "reset_time": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+        "min_on_minutes": { "type": "integer", "minimum": 0 },
+        "min_off_minutes": { "type": "integer", "minimum": 0 },
+        "max_block_minutes": { "type": "integer", "minimum": 0 },
+        "manual_override_minutes": { "type": "integer", "minimum": 0 },
+        "fan_enabled": { "type": "boolean" },
+        "fan_rh_high": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "fan_rh_low": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "fan_max_minutes": { "type": "integer", "minimum": 0 },
+        "fan_min_off_minutes": { "type": "integer", "minimum": 0 },
+        "fan_manual_override_minutes": { "type": "integer", "minimum": 0 },
+        "fan_night_enabled": { "type": "boolean" },
+        "fan_night_start": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+        "fan_night_end": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+        "fan_night_rh_high": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "fan_night_rh_low": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "fan_periodic_enabled": { "type": "boolean" },
+        "fan_periodic_every_minutes": { "type": "integer", "minimum": 0 },
+        "fan_periodic_duration_minutes": { "type": "integer", "minimum": 0 },
+        "fan_periodic_night_enabled": { "type": "boolean" },
+        "fan_periodic_night_every_minutes": { "type": "integer", "minimum": 0 },
+        "fan_periodic_night_duration_minutes": { "type": "integer", "minimum": 0 },
+        "heater_enabled": { "type": "boolean" },
+        "heater_sensor": { "type": "string", "enum": ["dht22", "ds18b20"] },
+        "heater_t_low": { "type": "number" },
+        "heater_t_high": { "type": "number" },
+        "heater_max_minutes": { "type": "integer", "minimum": 0 },
+        "heater_min_off_minutes": { "type": "integer", "minimum": 0 },
+        "heater_manual_override_minutes": { "type": "integer", "minimum": 0 },
+        "heater_fan_required": { "type": "boolean" },
+        "heater_night_enabled": { "type": "boolean" },
+        "heater_night_start": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+        "heater_night_end": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+        "heater_night_t_low": { "type": "number" },
+        "heater_night_t_high": { "type": "number" },
+        "pump_enabled": { "type": "boolean" },
+        "pump_soil_channel": { "type": "string", "enum": ["ch0", "ch1", "ch2", "ch3"] },
+        "pump_dry_threshold": { "type": "number" },
+        "pump_dry_when_above": { "type": "boolean" },
+        "pump_pulse_seconds": { "type": "integer", "minimum": 0 },
+        "pump_max_daily_seconds": { "type": "integer", "minimum": 0 },
+        "pump_window_start": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+        "pump_window_end": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+        "pump_manual_override_minutes": { "type": "integer", "minimum": 0 },
+        "soil_calibration": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ch0": { "$ref": "#/$defs/soil_calibration_entry" },
+            "ch1": { "$ref": "#/$defs/soil_calibration_entry" },
+            "ch2": { "$ref": "#/$defs/soil_calibration_entry" },
+            "ch3": { "$ref": "#/$defs/soil_calibration_entry" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "soil_calibration_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dry": { "type": ["number", "null"] },
+        "wet": { "type": ["number", "null"] }
+      }
+    }
+  }
+}

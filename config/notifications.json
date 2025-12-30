@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "level": "warning",
+  "cooldown_seconds": 300,
+  "telegram_enabled": true,
+  "email_enabled": false,
+  "allow_simulation": false
+}

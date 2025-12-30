@@ -1,0 +1,8 @@
+{
+  "sensor_log_days": 0,
+  "event_log_days": 0,
+  "actuator_log_days": 0,
+  "archive_enabled": false,
+  "archive_dir": "data/archives",
+  "cleanup_interval_hours": 24
+}

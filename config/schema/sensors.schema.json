@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "sensors.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dht22_gpio",
+    "bh1750_addr",
+    "ads1115_addr",
+    "ds18b20_enabled",
+    "lcd_enabled",
+    "lcd_addr",
+    "lcd_port",
+    "lcd_cols",
+    "lcd_rows",
+    "lcd_expander",
+    "lcd_charmap",
+    "lcd_mode",
+    "lcd_lines"
+  ],
+  "properties": {
+    "dht22_gpio": { "type": "integer" },
+    "bh1750_addr": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+    "ads1115_addr": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+    "ds18b20_enabled": { "type": "boolean" },
+    "lcd_enabled": { "type": "boolean" },
+    "lcd_addr": { "type": "string", "pattern": "^0x[0-9a-fA-F]+$" },
+    "lcd_port": { "type": "integer", "minimum": 0 },
+    "lcd_cols": { "type": "integer", "minimum": 1 },
+    "lcd_rows": { "type": "integer", "minimum": 1 },
+    "lcd_expander": { "type": "string" },
+    "lcd_charmap": { "type": "string" },
+    "lcd_mode": { "type": "string" },
+    "lcd_lines": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
+

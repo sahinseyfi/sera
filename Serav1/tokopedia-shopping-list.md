@@ -12,12 +12,12 @@ Amaç: daha güvenli güç dağıtımı, daha temiz kablolama, daha iyi sensör 
 | Ürün | Önerilen özellik | Adet | Neden? | Tokopedia arama |
 |---|---|---:|---|---|
 | 12V ana güç kaynağı (SMPS) | 12V **15–20A** (180–240W), kısa devre/akım/ısı korumalı, metal kasa | 1 | 4× LED bar + fanlar + PTC ile 8.5A adaptör sınırda kalabilir; headroom güvenlik sağlar | `power supply 12V 20A`, `SMPS 12V 20A` |
-| DC sigorta kutusu | ATO/ATC **8–12 hat** sigorta kutusu + sigorta seti (1A/3A/5A/10A) | 1 | Her hattı ayrı korumak (LED1/LED2/fan/pompa/PTC) yangın riskini azaltır | `fuse box ATO`, `fuse holder automotive` |
+| DC sigorta kutusu | ATO/ATC **8–12 hat** sigorta kutusu + sigorta seti (1A/3A/5A/10A) | 1 | Her hattı ayrı korumak (KAT1_LIGHT/KAT2_LIGHT/fan/pompa/valf/PTC) yangın riskini azaltır | `fuse box ATO`, `fuse holder automotive` |
 | IP korumalı kutu | En az IP54/65, kapak contalı; kablo rakoru için düz yüzey | 1 | Nemli ortamda PSU + dağıtım elemanlarını güvenle toplamak | `box enclosure IP65`, `waterproof enclosure` |
 | Kablo rakoru / gland seti | M16/M20 set (farklı çaplar) | 1 set | Kutudan çıkan kabloları sıkıp su girişini azaltmak | `cable gland M16`, `cable gland M20` |
 | Klemens & bağlantı | Wago 221/222 benzeri, klemens blok, ring pabuç + ferrül seti | 1 set | “Twist‑tape” yerine güvenli ve servis edilebilir bağlantı | `Wago 221`, `ferrule kit`, `terminal block` |
 | Krimp pensesi | Ferrül + pabuç için uygun | 1 | Sağlam ve standart bağlantı | `crimping tool ferrule` |
-| Kablo seti | 0.5–0.75mm² (fan/LED), 1.5mm² (12V ana hat), sinyal kablosu (2×0.22mm²) | yeterli | Voltaj düşümünü ve ısınmayı azaltır, düzenli demet yapmayı kolaylaştırır | `kabel 0.75mm`, `kabel 1.5mm`, `kabel signal 2 core` |
+| Kablo seti | LED hatları: **1.5–2.5mm²**; fan/valf/pompa: **0.75–1.0mm²**; 12V ana hat: **1.5–2.5mm²**; sinyal: **2×0.22–0.5mm²** | yeterli | Voltaj düşümünü ve ısınmayı azaltır, düzenli demet yapmayı kolaylaştırır | `kabel 1.5mm`, `kabel 2.5mm`, `kabel 0.75mm`, `kabel signal 2 core` |
 | Isı ile daralan makaron (ek) | Yapışkanlı (adhesive‑lined) karışık set | 1 | Nemli ortamda izolasyon/koruma daha iyi olur | `heat shrink adhesive` |
 
 ---
@@ -30,6 +30,10 @@ Amaç: daha güvenli güç dağıtımı, daha temiz kablolama, daha iyi sensör 
 | Flyback diyot seti | En az 3A sınıfı (pompa/fan için) | 1 set | Endüktif yüklerde MOSFET’i ve Pi’yi korur | `flyback diode 3A`, `diode 1N5408` |
 | TVS diyot (12V hat) | 12V otomotiv sınıfı TVS (transient absorber) | 1–2 | Fan/pompa anahtarlamada oluşan sıçramaları bastırır | `TVS diode 12V` |
 | 12V fanlar (tamamlamak) | Tercihen **4‑wire PWM** (hız kontrol istersek), ball bearing; aynı model seç | 3–4 | Hedef kurulum: Kat1 fan + Kat2 fan + egzoz + (opsiyonel) fide fanı; 1 yedek iyi olur | `fan 12V PWM 4 wire`, `fan 12V 120mm` |
+
+Not (çıkış sayısı hızlı kontrol):
+- Mevcut plan LED/fan/ısıtıcı tarafında **~10 kontrol çıkışı** istiyor; pompa/valf eklenirse artar (`Serav1/hardware-plan.md`).
+- Bu yüzden tek bir **8 kanal** MOSFET kart yetmeyebilir; **16 kanal** veya **2×8 kanal** daha risksiz.
 
 ### Aday ürün (bulundu): HAT2195R 8‑Channel MOSFET Driver
 - Ürün adı: “Module Driver Mosfet 8-Channel 30V 18A RENESAS HAT2195R 8Ch MOS DC PWM Power Switching”
@@ -46,30 +50,35 @@ Amaç: daha güvenli güç dağıtımı, daha temiz kablolama, daha iyi sensör 
 
 | Ürün | Önerilen özellik | Adet | Neden? | Tokopedia arama |
 |---|---|---:|---|---|
-| SHT31 sıcaklık/nem sensörü | I2C modül, adres seçilebilir (`0x44/0x45`) | 2 | SERA + FIDE için daha stabil ölçüm; DHT’ye göre daha iyi | `SHT31 I2C` |
-| LDR seti | 4× LDR + 10k (1%) direnç seti | 1 set | Kat1/Kat2 LDR + yedek; BH1750 yanında kalibrasyon planı | `LDR sensor`, `photoresistor`, `resistor 10k 1%` |
+| SHT31 sıcaklık/nem sensörü | I2C modül, adres seçilebilir (`0x44/0x45`) | 3 | Plan: KAT1 + KAT2 + FIDE için 1’er adet (opsiyon: SERA için +1). DHT’ye göre daha stabil. | `SHT31 I2C` |
+| BH1750 lux sensörü | I2C modül (GY‑302), adres seçilebilir (`0x23/0x5C`) | 3 | Plan: KAT1 + KAT2 + FIDE için 1’er adet (opsiyon: SERA için +1). Kat bazında lux ölçümü. | `BH1750`, `GY-302 BH1750` |
+| LDR seti (opsiyonel) | 4× LDR + 10k (1%) direnç seti | 1 set | BH1750 varken şart değil; yedek/deneysel ölçüm için | `LDR sensor`, `photoresistor`, `resistor 10k 1%` |
 | DS18B20 prob (ek) | Waterproof, 1‑Wire | 1–2 | Yedek/karşılaştırma | `DS18B20 waterproof` |
-| I2C çoklayıcı (opsiyonel) | TCA9548A | 1 | Aynı adreste birden fazla I2C cihazı eklemek istersen büyütür | `TCA9548A I2C multiplexer` |
+| I2C çoklayıcı (opsiyonel) | TCA9548A | 1 | Tek bir düğümde aynı adreste birden fazla I2C cihazı olursa iş görür; kat başına ayrı ESP32 düğümü varsa genelde gerekmez | `TCA9548A I2C multiplexer` |
 
-## P2.5 — Dağıtık Düğüm (Opsiyonel): ESP32
+## P2.5 — Dağıtık Düğüm (Seçilen Mimari): ESP32
 
-ESP32, serada **kablolamayı azaltmak** ve “kat/kapalı kutu” gibi yerlerde sensör/aktüatörü yerinde yönetmek için iyi.
-En güvenli kullanım: önce **sensör düğümü** olarak başla; kritik aktüatörleri (özellikle 230V ısıtıcı) Wi‑Fi’a bağlama.
+Bu projede her katta 1 adet ESP32 düğümü olacak. Düğüm:
+- SHT31 + BH1750 gibi sensörleri yerinde okur,
+- kamera görüntüsünü Raspberry Pi’ye gönderir,
+- (opsiyon) o katın LED/fan gibi DC yüklerini sürer (ama bu doküman setinde varsayılan yaklaşım: aktüatörleri Raspberry Pi + MOSFET kartı sürer).
+
+Not: ESP32‑CAM kartlarında pin/ADC sayısı sınırlı olabilir. Birden fazla kapasitif toprak nem sensörü bağlayacaksan kat düğümüne **ADS1115** eklemek pratik olur.
 
 | Ürün | Önerilen özellik | Adet | Neden? | Tokopedia arama |
 |---|---|---:|---|---|
-| ESP32 geliştirme kartı | ESP32‑WROOM‑32 / DevKit V1, USB’li, 4MB flash (CH340/CP2102) | 4 | KAT1 + KAT2 + FIDE için 3 düğüm + 1 yedek (Wi‑Fi/sensör/IO dağıtımı) | `ESP32 DevKit V1`, `ESP32 WROOM 32`, `modul ESP32` |
+| ADS1115 (opsiyonel, node başına) | I2C 16‑bit ADC, 4 kanal | 2–4 | Kat düğümünde analog sensör sayısını artırır; ESP32‑CAM ADC kısıtı varsa çözer | `ADS1115 I2C` |
 | DC‑DC step‑down (opsiyonel) | 12V→5V **3A** buck (kaliteli) | 3–4 | Her ESP32 düğümünü 12V ana hattan stabil 5V ile beslemek için | `buck converter 12V 5V 3A`, `DC DC step down 12V to 5V` |
 
 ## P2.6 — Kamera (Kat Görüntüsü)
 
-2 kat için pratik yaklaşım: **kat başına 1 kamera**.
+Pratik yaklaşım: **zone başına 1 kamera** (en az KAT1 + KAT2 + FIDE).
 
 | Ürün | Önerilen özellik | Adet | Neden? | Tokopedia arama |
 |---|---|---:|---|---|
-| ESP32‑CAM kamera kiti | ESP32‑CAM (AI Thinker) + OV2640 + **USB‑Serial CH340 adapter** (MB/Downloader) | 2 | Kat1 + Kat2 snapshot/stream | `ESP32-CAM OV2640 CH340`, `ESP32 CAM MB CH340` |
-| Harici antenli versiyon (opsiyonel) | IPEX/u.FL konnektörlü ESP32‑CAM + anten | 2 | Sera içinde Wi‑Fi çekimi zayıfsa fark eder | `ESP32-CAM external antenna`, `ESP32 CAM IPEX` |
-| 5V besleme (kamera için) | Her kamera için stabil 5V (tercihen 1A+); 12V hattan beslenecekse buck | 2 | ESP32‑CAM güç dalgalanmasına hassas; reset/stream kopmasını azaltır | `buck 12V to 5V 2A`, `power supply 5V 2A` |
+| ESP32‑CAM kamera kiti | ESP32‑CAM (AI Thinker) + OV2640 + **USB‑Serial CH340 adapter** (MB/Downloader) | 3 | KAT1 + KAT2 + FIDE snapshot/stream | `ESP32-CAM OV2640 CH340`, `ESP32 CAM MB CH340` |
+| Harici antenli versiyon (opsiyonel) | IPEX/u.FL konnektörlü ESP32‑CAM + anten | 3 | Sera içinde Wi‑Fi çekimi zayıfsa fark eder | `ESP32-CAM external antenna`, `ESP32 CAM IPEX` |
+| 5V besleme (kamera için) | Her kamera için stabil 5V (tercihen 1A+); 12V hattan beslenecekse buck | 3 | ESP32‑CAM güç dalgalanmasına hassas; reset/stream kopmasını azaltır | `buck 12V to 5V 2A`, `power supply 5V 2A` |
 
 ---
 
@@ -80,17 +89,21 @@ Debi sensörü ile “ne kadar su gitti?”yi ölçebilirsin; ama doğru bölü�
 
 | Ürün | Önerilen özellik | Adet | Neden? | Tokopedia arama |
 |---|---|---:|---|---|
-| Solenoid valf (NC) | **12V DC**, normalde kapalı (NC), uygun çap (1/4”–1/2”), su için | 2 | KAT1/KAT2 hatlarını ayrı kontrol etmek için (sadece sulanacak kat açılır) | `solenoid valve 12V NC`, `katup solenoid 12V NC` |
+| Solenoid valf (NC) | **12V DC**, normalde kapalı (NC), **1/4”** (hat standardın ile aynı çap), su için | 3 | KAT1/KAT2 için 2 adet + 1 yedek / ileride 3. hat | `solenoid valve 12V NC`, `katup solenoid 12V NC` |
 | Check valve (tek yön) | Uygun çap, düşük kaçak | 2–4 | Geri akışı ve “üst kattan geri sifon”u azaltır | `check valve`, `one way valve` |
 | Manifold / T bağlantı | Pompa çıkışını katlara bölmek için | 1 | Temiz dağıtım | `manifold`, `tee fitting` |
 | Sulama hortumu + fitting | Katlara giden hatlar için uygun çap | yeterli | Sızıntısız, servis edilebilir tesisat | `selang air`, `fitting quick`, `barb fitting` |
 | Inline filtre | Pompa çıkışında küçük filtre | 1 | Damlama uçlarını tıkamayı azaltır | `inline water filter` |
 | Damlama ucu / restrictor | Sabit debi/akış kısıtlayıcı | ihtiyaca göre | Saksılar arasında daha dengeli su dağıtımı | `drip emitter`, `flow restrictor` |
-| Debi sensörü (yerleşim notu) | (Opsiyon) Kat başına veya ortak | 1–2 | Hacim ölçümü + “akış yok” hata tespiti | `flow sensor hall` |
+| Debi sensörü (yerleşim notu) | (Opsiyon) Kat başına veya ortak | 1–3 | Hacim ölçümü + “akış yok” hata tespiti | `flow sensor hall` |
 
 Debi sensörü yerleşimi (pratik):
 - **Sadece 1 sensör alacaksan:** pompa çıkışı + manifold öncesi (ve aynı anda sadece 1 valf açık).
 - Daha doğru (ama daha çok parça): her kat hattına 1 debi sensörü (valften sonra).
+
+Not (sepet uyumu):
+- Sepette 1/4" **DC12 solenoid valf** ve 1/4" **debi sensörü**nden 3’er adet var; bu yaklaşım 2 hat (KAT1/KAT2) + 1 yedek / ileride 3. hat için uygundur.
+- Hortum + fitting çapını da 1/4" standardında tutarsan reducer ihtiyacı azalır.
 
 ---
 
@@ -99,7 +112,7 @@ Debi sensörü yerleşimi (pratik):
 | Ürün | Önerilen özellik | Adet | Neden? | Tokopedia arama |
 |---|---|---:|---|---|
 | Depo su seviye sensörü | Şamandıra switch (NC/NO) | 1 | Pompanın kuru çalışmasını engeller | `float switch` |
-| Debi sensörü (opsiyonel) | Hall effect flow sensor | 1 | Pompa çalışıyor ama akış yok mu? anlaşılır | `flow sensor hall` |
+| Debi sensörü (opsiyonel) | Hall effect flow sensor | 1–3 | Pompa çalışıyor ama akış yok mu? anlaşılır (hat başına sensör daha net teşhis sağlar) | `flow sensor hall` |
 | Dayanıklı depolama | High Endurance microSD 32/64GB veya küçük USB SSD | 1 | Log/trend yazımı için daha güvenilir | `high endurance microsd`, `usb ssd` |
 
 ---
@@ -107,7 +120,7 @@ Debi sensörü yerleşimi (pratik):
 ## P4 — PWM (Dimming/Hız Kontrol) için Mantıklı mı?
 
 Evet, **özellikle LED barlarda PWM mantıklı**:
-- Lux hedefini daha “yumuşak” tutturur (LED1/LED2 kademesine ek ince ayar).
+- Lux hedefini daha “yumuşak” tutturur (tek kanal PWM dimming ile ince ayar).
 - Enerji ve ısı yükünü düşürebilir.
 
 Ama birkaç kritik not:
@@ -127,15 +140,15 @@ Bu bölüm, “şu an sepette olanlar”ı kaybetmemek için.
 
 | Ürün | Birim (Rp) | Adet | Ara Toplam (Rp) | Not |
 |---|---:|---:|---:|---|
-| BH1750 Light Sensor | 17.500 | 3 | 52.500 | 3 adet aynı I2C hatta kullanılacaksa adres/çoklayıcı konusu var (BH1750 genelde 2 adres). Kat başına ayrı ESP düğümü ise sorun yok. |
-| Solenoid Valve 12V DC 3/4" (NC?) | 59.000 | 3 | 177.000 | “NC” ve gerçekten “12V DC coil” olduğundan emin ol. Bazı valfler minimum basınç ister. Ayrıca 3/4" ile `YF‑S401 1/8"` bağlantıları uymaz; reducer/fitting gerekir (en temizi: valf+debi sensörü+h ortum çapını aynı seçmek). |
+| BH1750 Light Sensor | 17.500 | 3 | 52.500 | Plan: KAT1 + KAT2 + FIDE için zone başına 1 adet. (Opsiyon: SERA genel ölçüm için +1.) BH1750 genelde 2 adres; kat başına ayrı düğüm olduğu için adres çakışması pratikte sorun olmaz. |
+| Solenoid Valve 12V DC 1/4" (NC?) | 67.000 | 3 | 201.000 | Satıcı: Utama Machinery. “NC” ve gerçekten “12V DC coil” olduğundan emin ol. Bazı valfler minimum basınç ister. Kullandığın hortum/fitting çapını 1/4" standardında tut. (Kargo: Ekonomi `Rp5.000`, asuransi `Rp1.300`, proteksi `Rp4.500`) |
 | Case ESP32‑CAM + shield programmer box | 24.700 | 3 | 74.100 | Kutu içinde ısı/nem birikmesine dikkat; lens önü buğulanmasın. |
-| GY‑SHT31 sıcaklık/nem modülü | 27.900 | 2 | 55.800 | 2 sensör aynı hatta olacaksa adres jumper’ı (0x44/0x45) kontrol et. |
-| Flow sensor YF‑S401 1/8" | 45.500 | 2 | 91.000 | Kalibrasyon şart; pulse çıkışını ESP32’ye 3.3V seviyede okuma planı yap. |
+| GY‑SHT31 sıcaklık/nem modülü | 27.900 | 3 | 83.700 | Plan: KAT1 + KAT2 + FIDE için 3 adet (opsiyon: SERA için +1). 2 sensör aynı hatta olacaksa adres jumper’ı (0x44/0x45) kontrol et. |
+| High Precision Liquid Flow Sensor 1/4" | 50.000 | 3 | 150.000 | Satıcı: Akhishop Electronics. Kalibrasyon şart; çıkış tipini (pulse/voltaj seviyesi) doğrula ve ESP32/RPi tarafında 3.3V uyumunu kontrol et. (Kargo: Reguler AnterAja `Rp9.200`, asuransi `Rp1.000`, proteksi `Rp3.000`) |
 | Float switch (water level) | 20.468 | 1 | 20.468 | Depo “kuru çalışma” engeli. |
-| ESP32‑CAM OV2640 + CH340 adapter | 118.500 | 3 | 355.500 | CH340 kartı programlamak içindir; final kurulumda her kart için stabil 5V besleme gerekir (buck ile). |
-| MOSFET Driver 8‑Channel HAT2195R | 131.000 | 1 | 131.000 | 8 kanal toplam çıkışa yetiyor mu kontrol et (valf/pompa/fan/LED sayısı). |
-|  |  |  | **957.368** | (kargo hariç) |
+| ESP32‑CAM OV2640 + CH340 adapter | 118.500 | 3 | 355.500 | Zone düğümleri için. CH340 kartı programlamak içindir; final kurulumda her kart için stabil 5V besleme gerekir (buck ile). Raspberry Pi görüntüyü alıp işleyecek. |
+| MOSFET Driver 8‑Channel HAT2195R | 131.000 | 1 | 131.000 | Mevcut plan ~8 çıkış istiyor (pompa/valf eklenirse artar); 8 kanal seçersen 2 kart veya 16 kanal alternatifi düşün. |
+|  |  |  | **1.068.268** | (kargo hariç) |
 
 ### Sepette olmayan ama “unutulmaması” gerekenler
 - 12V ana PSU: **15–20A** (LED+fan+valf+PTC için headroom).

@@ -11,6 +11,11 @@ data/
 .ssh/
 .config/
 .local/
+.vscode-server/
+.dotnet/
+.npm/
+.gemini/
+.wget-hsts
 .pytest_cache/
 .bash_history
 .bash_logout
@@ -26,3 +31,5 @@ data/
 *.bak_*
 moisture_log.csv
 .env
+.env.*
+!.env.example

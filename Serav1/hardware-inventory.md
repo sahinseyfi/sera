@@ -17,8 +17,8 @@ Fiyatlar, senin paylaştığın birim fiyatlardır (kargo/indirim değişebilir)
 
 | Ürün | Model/Kod | Teknik detay | Adet | Birim (TL) | Toplam (TL) | Not / Kullanım |
 |---|---|---:|---:|---:|---:|---|
-| ADS1115 16‑Bit 4 Kanal ADC | ADS1115 | I2C, 4 analog kanal, 16‑bit | 1 | 113,14 | 113,14 | Toprak + LDR okumaları (CH0‑CH3) |
-| DHT22 Dijital Sıcaklık/Nem Sensörü Modülü | DHT22 | Dijital temp/nem, modül | 1 | 87,71 | 87,71 | Sera veya fide (ileride SHT31’e geçiş planı var) |
+| ADS1115 16‑Bit 4 Kanal ADC | ADS1115 | I2C, 4 analog kanal, 16‑bit | 1 | 113,14 | 113,14 | Analog sensör okumaları (toprak nem vb.); ESP32 düğümlerine “node başına ADC” olarak eklenebilir |
+| DHT22 Dijital Sıcaklık/Nem Sensörü Modülü | DHT22 | Dijital temp/nem, modül | 1 | 87,71 | 87,71 | Yedek/legacy sensör; hedef ölçüm SHT31 |
 | DS18B20 (Su Geçirmez) Dijital Isı Sensörü | A0244 | 1‑Wire, waterproof prob | 1 | 44,74 | 44,74 | Yedek/alternatif sıcaklık ölçümü |
 | BH1750 Lux Sensörü Modülü | A0860 (GY‑302) | I2C lux sensörü | 1 | 89,48 | 89,48 | Referans lux (LDR kalibrasyonu için) |
 | Kapasitif Toprak Nem Sensörü (Higrometre) | — | Analog çıkış | 3 | 31,57 | 94,71 | Kat1 + Kat2 + 1 yedek |
@@ -27,7 +27,7 @@ Fiyatlar, senin paylaştığın birim fiyatlardır (kargo/indirim değişebilir)
 
 | Ürün | Model/Kod | Teknik detay | Adet | Birim (TL) | Toplam (TL) | Not / Kullanım |
 |---|---|---:|---:|---:|---:|---|
-| 12V LED Bar Alüminyum Çubuk | 5730/5630, 72 LED, 6500K | 100cm, 72 LED/m, 1000–1800 lm, 12V, 1,4–2A (≈17–24W) | 4 | 51,21 | 204,84 | Kat1: LED1/LED2, Kat2: LED1/LED2 (kademeli lux kontrol) |
+| 12V LED Bar Alüminyum Çubuk | 5730/5630, 72 LED, 6500K | 100cm, 72 LED/m, 1000–1800 lm, 12V, 1,4–2A (≈17–24W) | 4 | 51,21 | 204,84 | KAT1: 2 bar (tek PWM kanal), KAT2: 2 bar (tek PWM kanal) |
 | LED Profil (1m) | PJ1094 | Şeffaf kapaklı profil | 4 | 55,48 | 221,92 | LED bar montaj/profil |
 
 ## 3) Fanlar ve Isıtma
@@ -51,7 +51,7 @@ Fiyatlar, senin paylaştığın birim fiyatlardır (kargo/indirim değişebilir)
 
 | Ürün | Model/Kod | Teknik detay | Adet | Birim (TL) | Toplam (TL) | Not / Kullanım |
 |---|---|---:|---:|---:|---:|---|
-| 2 Kanal 5V Röle Kartı | — | 5V röle kartı | 1 | 54,26 | 54,26 | Küçük testler için; sistemde MOSFET daha uygun olabilir |
+| 2 Kanal 5V Röle Kartı | — | 5V röle kartı | 1 | 54,26 | 54,26 | KAT1/KAT2 canopy fan on/off için kullanılabilir (active‑low kontrolünü doğrula) |
 | Büyük Breadboard | A0036 | 830 pin | 1 | 46,87 | 46,87 | Masa testi / prototipleme |
 | Raspberry Pi Breadboard T‑Cobbler + 40 Pin Kablo | — | 40 pin breakout | 1 | 127,29 | 127,29 | Breadboard’da düzenli GPIO bağlantısı |
 | Jumper Kablo Seti | 140 parça | Karışık jumper | 1 | 61,10 | 61,10 | Prototip bağlantılar |
@@ -103,6 +103,6 @@ Bu bölüm, elinde olup fiyatı paylaşılmamış parçaları “kayıt altına 
 | Ayarlı trimpotlu modül | — | Üzerinde trimpot olan küçük modül (model belirsiz) | 1 | — | — | Model/fonksiyon foto ile netleşecek |
 
 ## Notlar / Açık Noktalar
-- Kat fanı sayısı ve “egzoz fan” sayısı proje hedefinde 3 adet gibi duruyor (Kat1 fan, Kat2 fan, egzoz fan). Envanterde şu an 1 adet 120mm fan var.
+- Fan hedefi: KAT1 kat fanı + KAT2 kat fanı + egzoz fan + (opsiyonel) FIDE kutu fanı. Envanterde şu an 1 adet 120mm fan var.
 - Röle tarafında: 2 kanal 5V röle kartı + (eski proje) 1/2/4/8 kanal röle modülleri var. Final tasarımda çıkış sayısına ve yük tipine göre MOSFET/SSR/röle seçimi netleşecek.
 - LDR’ler listede yok (Kat1/Kat2 için 2 adet). Eğer aldıysan model/fiyatını ekleyebilirim.
