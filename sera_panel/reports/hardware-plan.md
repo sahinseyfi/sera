@@ -70,6 +70,43 @@ Toplam: **10 kontrol çıkışı**.
 
 ---
 
+## 3.1) Sulama (Tek Pompa, Çok Kat) — “Nereye Ne Kadar?”
+
+Tek bir pompayla KAT1 ve KAT2’yi sulamak istiyorsan iki problem var:
+1) **Su nereye gidecek?** (yönlendirme)
+2) **Ne kadar gitti?** (miktar)
+
+### 3.1.1 Yönlendirme: Valf şart
+Pompayı çalıştırınca su, en az dirençli yola akar. Bu yüzden:
+- Katlara giden hatları **ayrı ayrı açıp kapatmak** için en az **2 adet NC (normalde kapalı) solenoid valf** gerekir.
+- Sulama anında sadece sulanacak katın valfi açılır, pompa çalışır, sonra kapanır.
+
+> Valf yoksa “tek pompa ile iki kata kontrollü sulama” pratikte olmaz; su rastgele bölüşür.
+
+### 3.1.2 Miktar: Debi sensörü ile hacim ölçümü
+Debi sensörü “puls” üretir; toplam pulse sayısı → yaklaşık hacim.
+
+Pratik yerleşim:
+- **Tek debi sensörü** alırsan: pompa çıkışı + manifold öncesi.
+  - Kural: aynı anda sadece **1 valf** açık olacak (böylece ölçülen hacim o kata aittir).
+- Daha hassas ama daha maliyetli: her kat hattına **1 debi sensörü** (valften sonra).
+
+### 3.1.3 Kalibrasyon (gerçek dünyada şart)
+Her katın hortum uzunluğu/irtifası farklı olacağı için debi değişir.
+Bu yüzden her kat için “ml/pulse” veya “ml/saniye” kalibrasyonu yapılır:
+- Valf aç → pompayı çalıştır → belirli pulse sayısında bir kaba su doldur → ml ölç → katsayıyı kaydet.
+
+### 3.1.4 Hidrolik küçük ama kritik parçalar
+- **Check valve (tek yön)**: geri akış/sifon riskini azaltır.
+- **Inline filtre**: damlama uçları tıkanmasın.
+- **Damlama ucu / restrictor**: saksılar arasında daha dengeli dağıtım.
+
+### 3.1.5 Güvenlik davranışı (kontrol mantığı)
+- Pompa çalışıyor ama debi sensörü pulse üretmiyorsa → **hemen durdur + uyarı** (depo boş, hortum çıktı, tıkandı).
+- Pompa için süre limitleri (max saniye, günlük max) korunur.
+
+---
+
 ## 4) Röle mi MOSFET mi? (Hızlı Karar)
 
 ### LED şeritler ve 12V fanlar için (DC yük)

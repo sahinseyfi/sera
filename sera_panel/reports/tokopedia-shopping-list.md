@@ -73,6 +73,27 @@ En güvenli kullanım: önce **sensör düğümü** olarak başla; kritik aktüa
 
 ---
 
+## P2.7 — Sulama (Tek Pompa, Çok Kat)
+
+Tek pompa ile birden fazla kata sulama yapmak için “su nereye gidecek?” sorusunun cevabı: **valf**.
+Debi sensörü ile “ne kadar su gitti?”yi ölçebilirsin; ama doğru bölüşüm için her kat hattını ayrı açıp kapatmak gerekir.
+
+| Ürün | Önerilen özellik | Adet | Neden? | Tokopedia arama |
+|---|---|---:|---|---|
+| Solenoid valf (NC) | **12V DC**, normalde kapalı (NC), uygun çap (1/4”–1/2”), su için | 2 | KAT1/KAT2 hatlarını ayrı kontrol etmek için (sadece sulanacak kat açılır) | `solenoid valve 12V NC`, `katup solenoid 12V NC` |
+| Check valve (tek yön) | Uygun çap, düşük kaçak | 2–4 | Geri akışı ve “üst kattan geri sifon”u azaltır | `check valve`, `one way valve` |
+| Manifold / T bağlantı | Pompa çıkışını katlara bölmek için | 1 | Temiz dağıtım | `manifold`, `tee fitting` |
+| Sulama hortumu + fitting | Katlara giden hatlar için uygun çap | yeterli | Sızıntısız, servis edilebilir tesisat | `selang air`, `fitting quick`, `barb fitting` |
+| Inline filtre | Pompa çıkışında küçük filtre | 1 | Damlama uçlarını tıkamayı azaltır | `inline water filter` |
+| Damlama ucu / restrictor | Sabit debi/akış kısıtlayıcı | ihtiyaca göre | Saksılar arasında daha dengeli su dağıtımı | `drip emitter`, `flow restrictor` |
+| Debi sensörü (yerleşim notu) | (Opsiyon) Kat başına veya ortak | 1–2 | Hacim ölçümü + “akış yok” hata tespiti | `flow sensor hall` |
+
+Debi sensörü yerleşimi (pratik):
+- **Sadece 1 sensör alacaksan:** pompa çıkışı + manifold öncesi (ve aynı anda sadece 1 valf açık).
+- Daha doğru (ama daha çok parça): her kat hattına 1 debi sensörü (valften sonra).
+
+---
+
 ## P3 — “Arıza Olunca Fark Et” Katmanı
 
 | Ürün | Önerilen özellik | Adet | Neden? | Tokopedia arama |
