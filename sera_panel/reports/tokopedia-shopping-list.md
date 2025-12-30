@@ -128,7 +128,7 @@ Bu bölüm, “şu an sepette olanlar”ı kaybetmemek için.
 | Ürün | Birim (Rp) | Adet | Ara Toplam (Rp) | Not |
 |---|---:|---:|---:|---|
 | BH1750 Light Sensor | 17.500 | 3 | 52.500 | 3 adet aynı I2C hatta kullanılacaksa adres/çoklayıcı konusu var (BH1750 genelde 2 adres). Kat başına ayrı ESP düğümü ise sorun yok. |
-| Solenoid Valve 12V DC 3/4" (NC?) | 59.000 | 3 | 177.000 | “NC” ve gerçekten “12V DC coil” olduğundan emin ol. Bazı valfler minimum basınç ister; 3/4" küçük pompa/ince hortumla uyumsuz olabilir. |
+| Solenoid Valve 12V DC 3/4" (NC?) | 59.000 | 3 | 177.000 | “NC” ve gerçekten “12V DC coil” olduğundan emin ol. Bazı valfler minimum basınç ister. Ayrıca 3/4" ile `YF‑S401 1/8"` bağlantıları uymaz; reducer/fitting gerekir (en temizi: valf+debi sensörü+h ortum çapını aynı seçmek). |
 | Case ESP32‑CAM + shield programmer box | 24.700 | 3 | 74.100 | Kutu içinde ısı/nem birikmesine dikkat; lens önü buğulanmasın. |
 | GY‑SHT31 sıcaklık/nem modülü | 27.900 | 2 | 55.800 | 2 sensör aynı hatta olacaksa adres jumper’ı (0x44/0x45) kontrol et. |
 | Flow sensor YF‑S401 1/8" | 45.500 | 2 | 91.000 | Kalibrasyon şart; pulse çıkışını ESP32’ye 3.3V seviyede okuma planı yap. |
