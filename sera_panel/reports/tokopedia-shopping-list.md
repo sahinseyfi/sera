@@ -118,3 +118,27 @@ Ama birkaç kritik not:
 PWM’i “opsiyonel” tutmak için:
 - Donanım tarafında MOSFET kart seçerken PWM destekli ve 3.3V uyumlu olmasına dikkat et.
 - Yazılımda her kanal için “Mode: on/off vs pwm” şeklinde konfigürasyon mantığı planlanabilir.
+
+---
+
+## Sepet Snapshot (Tokopedia) — 2025-12-30
+
+Bu bölüm, “şu an sepette olanlar”ı kaybetmemek için.
+
+| Ürün | Birim (Rp) | Adet | Ara Toplam (Rp) | Not |
+|---|---:|---:|---:|---|
+| BH1750 Light Sensor | 17.500 | 3 | 52.500 | 3 adet aynı I2C hatta kullanılacaksa adres/çoklayıcı konusu var (BH1750 genelde 2 adres). Kat başına ayrı ESP düğümü ise sorun yok. |
+| Solenoid Valve 12V DC 3/4" (NC?) | 59.000 | 3 | 177.000 | “NC” ve gerçekten “12V DC coil” olduğundan emin ol. Bazı valfler minimum basınç ister; 3/4" küçük pompa/ince hortumla uyumsuz olabilir. |
+| Case ESP32‑CAM + shield programmer box | 24.700 | 3 | 74.100 | Kutu içinde ısı/nem birikmesine dikkat; lens önü buğulanmasın. |
+| GY‑SHT31 sıcaklık/nem modülü | 27.900 | 2 | 55.800 | 2 sensör aynı hatta olacaksa adres jumper’ı (0x44/0x45) kontrol et. |
+| Flow sensor YF‑S401 1/8" | 45.500 | 2 | 91.000 | Kalibrasyon şart; pulse çıkışını ESP32’ye 3.3V seviyede okuma planı yap. |
+| Float switch (water level) | 20.468 | 1 | 20.468 | Depo “kuru çalışma” engeli. |
+| ESP32‑CAM OV2640 + CH340 adapter | 118.500 | 3 | 355.500 | CH340 kartı programlamak içindir; final kurulumda her kart için stabil 5V besleme gerekir (buck ile). |
+| MOSFET Driver 8‑Channel HAT2195R | 131.000 | 1 | 131.000 | 8 kanal toplam çıkışa yetiyor mu kontrol et (valf/pompa/fan/LED sayısı). |
+|  |  |  | **957.368** | (kargo hariç) |
+
+### Sepette olmayan ama “unutulmaması” gerekenler
+- 12V ana PSU: **15–20A** (LED+fan+valf+PTC için headroom).
+- Her ESP32/ESP32‑CAM için stabil 5V: `12V→5V` buck (en az 2A; mümkünse 3A).
+- DC sigorta kutusu + sigortalar, kablo rakorları, klemens/ferrül/pabuç, kalın kesit kablo.
+- Sulama için: manifold/T bağlantı, check valve, inline filtre, hortum + fitting, damlama uçları.
