@@ -9,6 +9,7 @@ import sqlite3
 import subprocess
 import threading
 import time
+import uuid
 from collections import deque
 from datetime import date, datetime, timedelta, time as dt_time, timezone
 from pathlib import Path
@@ -34,12 +35,14 @@ NOTIFICATIONS_CONFIG_PATH = CONFIG_DIR / "notifications.json"
 RETENTION_CONFIG_PATH = CONFIG_DIR / "retention.json"
 PANEL_CONFIG_PATH = CONFIG_DIR / "panel.json"
 UPDATES_PATH = CONFIG_DIR / "updates.json"
+CATALOG_CONFIG_PATH = CONFIG_DIR / "catalog.json"
 DB_PATH = DATA_DIR / "sera.db"
 SENSOR_CSV_LOG_DIR = DATA_DIR / "sensor_logs"
 
 SENSOR_STALE_SECONDS = 15
 SENSOR_ALERT_COOLDOWN_SECONDS = 120
 SENSOR_LOG_INTERVAL_SECONDS = 10
+PUMP_DAILY_CACHE_SECONDS = 30
 DEFAULT_LIMITS = {
     "pump_max_seconds": 15,
     "pump_cooldown_seconds": 60,
@@ -131,14 +134,74 @@ DEFAULT_AUTOMATION = {
     },
 }
 
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _parse_node_tokens(raw: str) -> Dict[str, str]:
+    tokens: Dict[str, str] = {}
+    for item in (raw or "").split(","):
+        item = item.strip()
+        if not item or ":" not in item:
+            continue
+        node_id, token = item.split(":", 1)
+        node_id = node_id.strip()
+        token = token.strip()
+        if node_id and token:
+            tokens[node_id] = token
+    return tokens
+
+
 SIMULATION_MODE = os.getenv("SIMULATION_MODE", "0") == "1"
 DISABLE_BACKGROUND_LOOPS = os.getenv("DISABLE_BACKGROUND_LOOPS", "0") == "1"
+USE_NEW_UI = os.getenv("USE_NEW_UI", "0") == "1"
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN")
 LIGHT_CHANNEL_NAME = os.getenv("LIGHT_CHANNEL_NAME")
 FAN_CHANNEL_NAME = os.getenv("FAN_CHANNEL_NAME")
 PUMP_CHANNEL_NAME = os.getenv("PUMP_CHANNEL_NAME")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+NODE_TOKENS_RAW = os.getenv("NODE_TOKENS", "")
+NODE_TOKENS = _parse_node_tokens(NODE_TOKENS_RAW)
+NODE_RATE_LIMIT_SECONDS = _env_float("NODE_RATE_LIMIT_SECONDS", 0.2)
+NODE_COMMAND_RATE_LIMIT_SECONDS = _env_float("NODE_COMMAND_RATE_LIMIT_SECONDS", NODE_RATE_LIMIT_SECONDS)
+NODE_COMMAND_DEFAULT_TTL_SECONDS = _env_int("NODE_COMMAND_TTL_SECONDS", 30)
+NODE_COMMAND_MAX_QUEUE = _env_int("NODE_COMMAND_MAX_QUEUE", 50)
+NODE_STALE_SECONDS = _env_int("NODE_STALE_SECONDS", 15)
+TREND_MAX_POINTS_DEFAULT = 120
+TREND_MAX_POINTS_LIMIT = 2000
+
+
+def _downsample_points(points: List[List[float]], max_points: int) -> List[List[float]]:
+    if max_points <= 0 or len(points) <= max_points:
+        return points
+    if max_points == 1:
+        return [points[-1]]
+    last_index = len(points) - 1
+    step = last_index / float(max_points - 1)
+    indices: List[int] = []
+    for i in range(max_points):
+        idx = int(round(i * step))
+        if not indices or idx != indices[-1]:
+            indices.append(idx)
+    return [points[i] for i in indices]
 
 
 def _parse_hhmm(value: str) -> dt_time:
@@ -204,7 +267,14 @@ class ActuatorManager:
         self.timers: Dict[str, threading.Timer] = {}
         self.lock = threading.Lock()
         self.last_pump_stop_ts: float = 0
+        self.last_stop_ts: Dict[str, float] = {}
         self.load_config(channel_config)
+
+    def _is_pump(self, name: str) -> bool:
+        role = str(self.channels.get(name, {}).get("role") or "").lower()
+        if role:
+            return role == "pump"
+        return "PUMP" in name
 
     def load_config(self, channel_config: List[Dict[str, Any]]) -> None:
         with self.lock:
@@ -215,6 +285,7 @@ class ActuatorManager:
             for chan in channel_config:
                 name = chan["name"].upper()
                 self.channels[name] = chan
+                self.last_stop_ts.setdefault(name, 0.0)
                 pin = int(chan["gpio_pin"])
                 active_low = bool(chan.get("active_low", False))
                 safe_default = bool(chan.get("safe_default", False))
@@ -248,15 +319,17 @@ class ActuatorManager:
             timer.daemon = True
             timer.start()
             self.timers[name] = timer
-        if not on and name.endswith("PUMP") and reason not in ("startup", "config_reload"):
-            self.last_pump_stop_ts = time.time()
+        if not on and reason not in ("startup", "config_reload"):
+            self.last_stop_ts[name] = time.time()
+            if self._is_pump(name):
+                self.last_pump_stop_ts = time.time()
 
     def set_state(self, name: str, on: bool, reason: str, duration: Optional[int] = None) -> None:
         with self.lock:
             if name not in self.channels:
                 raise ActuationError(f"Unknown actuator: {name}")
             self._apply(name, on, reason, duration)
-            if not on and name.endswith("PUMP"):
+            if not on and self._is_pump(name):
                 self.last_pump_stop_ts = time.time()
 
     def set_all_off(self, reason: str) -> None:
@@ -855,6 +928,7 @@ class AutomationEngine:
         self.last_lux_error_active: bool = False
         self.block_until_ts: float = 0.0
         self.manual_override_until_ts: float = 0.0
+        self.manual_override_cancel_ts: float = 0.0
         self.last_lux_max_alert_ts: float = 0.0
         self.last_auto_off_ts: float = 0.0
         self.last_auto_off_reason: str = ""
@@ -862,18 +936,23 @@ class AutomationEngine:
         self.last_target_met_alert_ts: float = 0.0
         self.last_target_met_active: bool = False
         self.fan_manual_override_until_ts: float = 0.0
+        self.fan_manual_override_cancel_ts: float = 0.0
         self.fan_last_auto_off_ts: float = 0.0
         self.fan_last_auto_off_reason: str = ""
         self.fan_periodic_last_start_ts: float = 0.0
         self.heater_manual_override_until_ts: float = 0.0
+        self.heater_manual_override_cancel_ts: float = 0.0
         self.heater_last_auto_off_ts: float = 0.0
         self.heater_last_auto_off_reason: str = ""
         self.pump_manual_override_until_ts: float = 0.0
+        self.pump_manual_override_cancel_ts: float = 0.0
         self.pump_last_auto_ts: float = 0.0
         self.pump_daily_seconds: float = 0.0
+        self.pump_daily_cache_ts: float = 0.0
         self.pump_block_until_ts: float = 0.0
         self.pump_last_auto_off_ts: float = 0.0
         self.pump_last_auto_off_reason: str = ""
+        self.auto_block_ts: Dict[str, float] = {}
 
     def reset_daily(self) -> None:
         self.ok_minutes_today = 0.0
@@ -893,15 +972,59 @@ class AutomationEngine:
         self.pump_manual_override_until_ts = 0.0
         self.pump_last_auto_ts = 0.0
         self.pump_daily_seconds = 0.0
+        self.pump_daily_cache_ts = 0.0
         self.pump_block_until_ts = 0.0
         self.pump_last_auto_off_ts = 0.0
         self.pump_last_auto_off_reason = ""
+        self.auto_block_ts.clear()
         _record_threshold_alert(
             "pump_daily_limit",
             False,
             "Pompa otomasyonu durdu: günlük limit doldu.",
             "Pompa günlük limit sıfırlandı.",
         )
+
+    def _manual_override_until(
+        self,
+        reason: str,
+        last_change: Optional[float],
+        minutes: int,
+        cancel_ts: float,
+    ) -> float:
+        if minutes <= 0 or reason != "manual":
+            return 0.0
+        if not last_change:
+            return 0.0
+        if cancel_ts and last_change <= cancel_ts:
+            return 0.0
+        override_until = last_change + minutes * 60
+        if time.time() < override_until:
+            return override_until
+        return 0.0
+
+    def clear_manual_override(self, scope: str) -> List[str]:
+        scope = (scope or "").strip().lower()
+        now_ts = time.time()
+        cleared: List[str] = []
+        if scope in ("all", "lux", "light"):
+            self.manual_override_cancel_ts = now_ts
+            self.manual_override_until_ts = 0.0
+            cleared.append("lux")
+        if scope in ("all", "fan"):
+            self.fan_manual_override_cancel_ts = now_ts
+            self.fan_manual_override_until_ts = 0.0
+            cleared.append("fan")
+        if scope in ("all", "heater"):
+            self.heater_manual_override_cancel_ts = now_ts
+            self.heater_manual_override_until_ts = 0.0
+            cleared.append("heater")
+        if scope in ("all", "pump"):
+            self.pump_manual_override_cancel_ts = now_ts
+            self.pump_manual_override_until_ts = 0.0
+            cleared.append("pump")
+        if cleared:
+            log_event("automation", "info", "Manual override cleared", {"scopes": cleared})
+        return cleared
 
     def _window_bounds(self, now: datetime) -> tuple[datetime, datetime]:
         start = _parse_hhmm(self.config.get("window_start", "06:00"))
@@ -1039,6 +1162,40 @@ class AutomationEngine:
         is_dry = value_f >= threshold if dry_when_above else value_f <= threshold
         return is_dry, value_f
 
+    def _pump_daily_used(self, pump_channel: Optional[str]) -> float:
+        if not pump_channel:
+            self.pump_daily_seconds = 0.0
+            self.pump_daily_cache_ts = time.time()
+            return 0.0
+        now_ts = time.time()
+        if now_ts - self.pump_daily_cache_ts < PUMP_DAILY_CACHE_SECONDS:
+            return self.pump_daily_seconds
+        used = _actuator_daily_seconds(pump_channel)
+        self.pump_daily_seconds = used
+        self.pump_daily_cache_ts = now_ts
+        return used
+
+    def _log_auto_block(self, channel: str, reason: str, error: Exception) -> None:
+        now_ts = time.time()
+        last_ts = self.auto_block_ts.get(channel, 0.0)
+        if now_ts - last_ts < SENSOR_ALERT_COOLDOWN_SECONDS:
+            return
+        self.auto_block_ts[channel] = now_ts
+        log_event(
+            "automation",
+            "warning",
+            f"{channel} automation blocked ({reason})",
+            {"error": str(error)},
+        )
+
+    def _try_auto_on(self, channel: str, seconds: Optional[int], reason: str) -> bool:
+        try:
+            apply_actuator_command(channel, True, seconds, reason)
+            return True
+        except ActuationError as exc:
+            self._log_auto_block(channel, reason, exc)
+            return False
+
     def _automation_off(self, channel: str, reason: str) -> None:
         self.actuator_manager.set_state(channel, False, reason)
         self.last_auto_off_ts = time.time()
@@ -1096,9 +1253,11 @@ class AutomationEngine:
         pump_max_daily = int(self.config.get("pump_max_daily_seconds", 0) or 0)
         pump_pulse_seconds = int(self.config.get("pump_pulse_seconds", 0) or 0)
         pump_within_window = self._pump_within_window(now) if pump_enabled else False
-        pump_channel = str(self.config.get("pump_soil_channel", "ch0") or "ch0").lower()
+        pump_soil_channel = str(self.config.get("pump_soil_channel", "ch0") or "ch0").lower()
         pump_threshold = float(self.config.get("pump_dry_threshold", 0) or 0)
         pump_dry_when_above = bool(self.config.get("pump_dry_when_above"))
+        pump_actuator = self._find_pump_channel() if (pump_enabled or pump_max_daily > 0) else None
+        pump_daily_used = self._pump_daily_used(pump_actuator) if pump_actuator else 0.0
         return {
             "enabled": enabled,
             "lux_paused": lux_paused,
@@ -1144,12 +1303,12 @@ class AutomationEngine:
             },
             "pump": {
                 "enabled": pump_enabled,
-                "soil_channel": pump_channel,
+                "soil_channel": pump_soil_channel,
                 "dry_threshold": pump_threshold,
                 "dry_when_above": pump_dry_when_above,
                 "pulse_seconds": pump_pulse_seconds,
                 "max_daily_seconds": pump_max_daily,
-                "daily_used_seconds": round(self.pump_daily_seconds, 1),
+                "daily_used_seconds": round(pump_daily_used, 1),
                 "within_window": pump_within_window,
                 "block_until_ts": self.pump_block_until_ts or None,
                 "manual_override_until_ts": pump_manual_until or None,
@@ -1208,11 +1367,15 @@ class AutomationEngine:
         reason = str(state.get("reason") or "")
         last_change = state.get("last_change_ts")
         manual_override_minutes = int(self.config.get("manual_override_minutes", 0) or 0)
-        if manual_override_minutes > 0 and reason == "manual":
-            override_until = (last_change or time.time()) + manual_override_minutes * 60
-            if last_change and time.time() < override_until:
-                self.manual_override_until_ts = override_until
-                return
+        override_until = self._manual_override_until(
+            reason,
+            last_change,
+            manual_override_minutes,
+            self.manual_override_cancel_ts,
+        )
+        if override_until:
+            self.manual_override_until_ts = override_until
+            return
         self.manual_override_until_ts = 0.0
         lux_too_high = lux_max > 0 and lux_value is not None and lux_value >= lux_max
         if lux_too_high:
@@ -1253,8 +1416,7 @@ class AutomationEngine:
                             self.last_min_off_alert_ts = now_ts
                         return
             if not state.get("state"):
-                self.actuator_manager.set_state(light_channel, True, "automation")
-                log_actuation(light_channel, True, "automation", None)
+                self._try_auto_on(light_channel, None, "automation")
             return
         if state.get("state") and reason.startswith("automation"):
             if not within_window:
@@ -1292,11 +1454,15 @@ class AutomationEngine:
         reason = str(state.get("reason") or "")
         last_change = state.get("last_change_ts")
         manual_override_minutes = int(self.config.get("fan_manual_override_minutes", 0) or 0)
-        if manual_override_minutes > 0 and reason == "manual":
-            override_until = (last_change or time.time()) + manual_override_minutes * 60
-            if last_change and time.time() < override_until:
-                self.fan_manual_override_until_ts = override_until
-                return
+        override_until = self._manual_override_until(
+            reason,
+            last_change,
+            manual_override_minutes,
+            self.fan_manual_override_cancel_ts,
+        )
+        if override_until:
+            self.fan_manual_override_until_ts = override_until
+            return
         self.fan_manual_override_until_ts = 0.0
         rh_high, rh_low, _night_active = self._fan_thresholds(now)
         max_minutes = int(self.config.get("fan_max_minutes", 0) or 0)
@@ -1317,8 +1483,7 @@ class AutomationEngine:
                 if time.time() - self.fan_last_auto_off_ts < min_off_minutes * 60:
                     return
             if not state.get("state"):
-                self.actuator_manager.set_state(fan_channel, True, "fan_auto_on")
-                log_actuation(fan_channel, True, "fan_auto_on", None)
+                self._try_auto_on(fan_channel, None, "fan_auto_on")
             return
         if state.get("state") and is_auto:
             self._fan_off(fan_channel, "fan_auto_off")
@@ -1333,11 +1498,15 @@ class AutomationEngine:
         reason = str(state.get("reason") or "")
         last_change = state.get("last_change_ts")
         manual_override_minutes = int(self.config.get("fan_manual_override_minutes", 0) or 0)
-        if manual_override_minutes > 0 and reason == "manual":
-            override_until = (last_change or time.time()) + manual_override_minutes * 60
-            if last_change and time.time() < override_until:
-                self.fan_manual_override_until_ts = override_until
-                return
+        override_until = self._manual_override_until(
+            reason,
+            last_change,
+            manual_override_minutes,
+            self.fan_manual_override_cancel_ts,
+        )
+        if override_until:
+            self.fan_manual_override_until_ts = override_until
+            return
         if self.fan_manual_override_until_ts and time.time() < self.fan_manual_override_until_ts:
             return
         self.fan_manual_override_until_ts = 0.0
@@ -1367,21 +1536,19 @@ class AutomationEngine:
                                 humidity = float(dht_entry.get("humidity"))
                             except (TypeError, ValueError):
                                 humidity = None
-                            if humidity is not None:
-                                rh_high, _rh_low, _night = self._fan_thresholds(now)
-                                if humidity >= rh_high:
-                                    self.actuator_manager.set_state(fan_channel, True, "fan_auto_on")
-                                    log_actuation(fan_channel, True, "fan_auto_on", None)
-                                    return
+                                if humidity is not None:
+                                    rh_high, _rh_low, _night = self._fan_thresholds(now)
+                                    if humidity >= rh_high:
+                                        self._try_auto_on(fan_channel, None, "fan_auto_on")
+                                        return
                     self._fan_off(fan_channel, "fan_periodic_off")
             return
 
         now_ts = time.time()
         if self.fan_periodic_last_start_ts and now_ts - self.fan_periodic_last_start_ts < every_minutes * 60:
             return
-        self.actuator_manager.set_state(fan_channel, True, "fan_periodic_on")
-        log_actuation(fan_channel, True, "fan_periodic_on", None)
-        self.fan_periodic_last_start_ts = now_ts
+        if self._try_auto_on(fan_channel, duration_minutes * 60, "fan_periodic_on"):
+            self.fan_periodic_last_start_ts = now_ts
 
     def _tick_heater(self, now: datetime, safe_mode: bool) -> None:
         if safe_mode:
@@ -1402,11 +1569,15 @@ class AutomationEngine:
         reason = str(state.get("reason") or "")
         last_change = state.get("last_change_ts")
         manual_override_minutes = int(self.config.get("heater_manual_override_minutes", 0) or 0)
-        if manual_override_minutes > 0 and reason == "manual":
-            override_until = (last_change or time.time()) + manual_override_minutes * 60
-            if last_change and time.time() < override_until:
-                self.heater_manual_override_until_ts = override_until
-                return
+        override_until = self._manual_override_until(
+            reason,
+            last_change,
+            manual_override_minutes,
+            self.heater_manual_override_cancel_ts,
+        )
+        if override_until:
+            self.heater_manual_override_until_ts = override_until
+            return
         self.heater_manual_override_until_ts = 0.0
         t_low, t_high, _night_active = self._heater_thresholds(now)
         max_minutes = int(self.config.get("heater_max_minutes", 0) or 0)
@@ -1452,8 +1623,7 @@ class AutomationEngine:
                 if time.time() - self.heater_last_auto_off_ts < min_off_minutes * 60:
                     return
             if not state.get("state"):
-                self.actuator_manager.set_state(heater_channel, True, "heater_auto_on")
-                log_actuation(heater_channel, True, "heater_auto_on", None)
+                self._try_auto_on(heater_channel, None, "heater_auto_on")
             return
         if state.get("state") and is_auto:
             self._heater_off(heater_channel, "heater_auto_off")
@@ -1468,15 +1638,20 @@ class AutomationEngine:
         pump_channel = self._find_pump_channel()
         if not pump_channel:
             return
+        daily_used = self._pump_daily_used(pump_channel)
         state = self.actuator_manager.get_state().get(pump_channel, {})
         reason = str(state.get("reason") or "")
         last_change = state.get("last_change_ts")
         manual_override_minutes = int(self.config.get("pump_manual_override_minutes", 0) or 0)
-        if manual_override_minutes > 0 and reason == "manual":
-            override_until = (last_change or time.time()) + manual_override_minutes * 60
-            if last_change and time.time() < override_until:
-                self.pump_manual_override_until_ts = override_until
-                return
+        override_until = self._manual_override_until(
+            reason,
+            last_change,
+            manual_override_minutes,
+            self.pump_manual_override_cancel_ts,
+        )
+        if override_until:
+            self.pump_manual_override_until_ts = override_until
+            return
         self.pump_manual_override_until_ts = 0.0
         if state.get("state"):
             return
@@ -1492,7 +1667,7 @@ class AutomationEngine:
                     "Pompa otomasyonu durdu: günlük limit doldu.",
                     "Pompa günlük limit sıfırlandı.",
                 )
-        if max_daily > 0 and self.pump_daily_seconds >= max_daily:
+        if max_daily > 0 and daily_used >= max_daily:
             if not self.pump_block_until_ts:
                 reset_key = self._reset_key(now)
                 reset_dt = datetime.combine(reset_key, _parse_hhmm(self.config.get("reset_time", "00:00")))
@@ -1528,15 +1703,18 @@ class AutomationEngine:
         max_pump = int(app_state.limits.get("pump_max_seconds", 15) or 15)
         pulse_seconds = min(pulse_seconds, max_pump)
         if max_daily > 0:
-            remaining = max_daily - self.pump_daily_seconds
+            remaining = max_daily - daily_used
             if remaining <= 0:
                 return
             pulse_seconds = min(pulse_seconds, remaining)
         try:
-            apply_actuator_command(pump_channel, True, pulse_seconds, "pump_auto_on")
-        except ActuationError:
+            applied_seconds = apply_actuator_command(pump_channel, True, pulse_seconds, "pump_auto_on")
+        except ActuationError as exc:
+            self._log_auto_block(pump_channel, "pump_auto_on", exc)
             return
-        self.pump_daily_seconds += pulse_seconds
+        if applied_seconds:
+            self.pump_daily_seconds = daily_used + applied_seconds
+            self.pump_daily_cache_ts = time.time()
         self.pump_last_auto_ts = time.time()
 
 
@@ -1651,7 +1829,7 @@ class AlertManager:
 
     def add(self, severity: str, message: str) -> None:
         with self.lock:
-            ts = datetime.utcnow().isoformat()
+            ts = datetime.now(timezone.utc).isoformat()
             self.alerts.append({"severity": severity, "message": message, "ts": ts})
             self.alerts = self.alerts[-50:]
         log_event("alert", severity, message, None)
@@ -1725,7 +1903,7 @@ class RetentionManager:
             try:
                 import shutil
 
-                stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+                stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
                 shutil.copy2(DB_PATH, archive_dir / f"sera-{stamp}.db")
             except Exception:
                 pass
@@ -1748,7 +1926,7 @@ class RetentionManager:
             conn.close()
 
         if sensor_days > 0:
-            cutoff_date = datetime.utcnow().date() - timedelta(days=sensor_days)
+            cutoff_date = datetime.now(timezone.utc).date() - timedelta(days=sensor_days)
             for path in SENSOR_CSV_LOG_DIR.glob("sensor_log_*.csv"):
                 m = re.search(r"sensor_log_(\\d{4}-\\d{2}-\\d{2})\\.csv$", path.name)
                 if not m:
@@ -1793,6 +1971,7 @@ class AppState:
             self.safe_mode = enabled
             if enabled:
                 self.actuator_manager.set_all_off("safe_mode")
+                _clear_all_node_command_queues("safe_mode")
         log_event("system", "warning" if enabled else "info", f"SAFE MODE {'AÇIK' if enabled else 'KAPALI'}", None)
 
     def update_limits(self, data: Dict[str, Any]) -> None:
@@ -2057,6 +2236,15 @@ def load_panel_config() -> Dict[str, Any]:
     return defaults
 
 
+def load_catalog_config() -> Optional[Dict[str, Any]]:
+    if not CATALOG_CONFIG_PATH.exists():
+        return None
+    data = _load_json_or_none(CATALOG_CONFIG_PATH)
+    if isinstance(data, dict):
+        return data
+    return None
+
+
 def _is_hhmm(value: Any) -> bool:
     if not isinstance(value, str):
         return False
@@ -2312,6 +2500,7 @@ sensors_config = load_sensors_config()
 notifications_config = load_notifications_config()
 retention_config = load_retention_config()
 panel_config = load_panel_config()
+catalog_config = load_catalog_config()
 actuator_manager = ActuatorManager(backend, channel_config)
 sensor_manager = SensorManager()
 sensor_manager.reload_config(sensors_config)
@@ -2324,6 +2513,14 @@ retention_manager = RetentionManager(retention_config)
 app_state.update_limits(panel_config.get("limits") or {})
 app_state.update_alerts(panel_config.get("alerts") or {})
 automation_engine.config.update(panel_config.get("automation") or {})
+
+NODE_LOCK = threading.Lock()
+NODE_REGISTRY: Dict[str, Dict[str, Any]] = {}
+NODE_COMMANDS: Dict[str, List[Dict[str, Any]]] = {}
+NODE_RATE_LIMIT: Dict[str, float] = {}
+NODE_COMMAND_RATE_LIMIT: Dict[str, float] = {}
+NODE_ACTUATOR_STATE: Dict[str, Dict[str, Any]] = {}
+NODE_SENSOR_STATE: Dict[str, Dict[str, Any]] = {}
 
 
 # Database
@@ -2368,6 +2565,21 @@ def init_db() -> None:
     )
     cur.execute(
         """
+        CREATE TABLE IF NOT EXISTS telemetry_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts REAL NOT NULL,
+            node_id TEXT,
+            zone TEXT,
+            metric TEXT NOT NULL,
+            value REAL,
+            unit TEXT,
+            source TEXT,
+            quality TEXT
+        )
+        """
+    )
+    cur.execute(
+        """
         CREATE TABLE IF NOT EXISTS event_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts REAL NOT NULL,
@@ -2381,6 +2593,8 @@ def init_db() -> None:
     _ensure_column(cur, "sensor_log", "soil_ch2", "REAL")
     _ensure_column(cur, "sensor_log", "soil_ch3", "REAL")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_sensor_log_ts ON sensor_log (ts)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_log_ts ON telemetry_log (ts)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_telemetry_log_zone_metric_ts ON telemetry_log (zone, metric, ts)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_event_log_ts ON event_log (ts)")
     conn.commit()
     conn.close()
@@ -2420,6 +2634,390 @@ def log_event(category: str, level: str, message: str, meta: Optional[Dict[str, 
         conn.close()
     except Exception:
         pass
+
+
+def _node_token_from_request() -> Optional[str]:
+    token = request.headers.get("X-Node-Token") or request.headers.get("Authorization") or ""
+    token = token.strip()
+    if token.lower().startswith("bearer "):
+        token = token[7:].strip()
+    return token or None
+
+
+def _require_node_auth(node_id: str) -> Optional[Tuple[Response, int]]:
+    if not NODE_TOKENS and SIMULATION_MODE:
+        return None
+    if not NODE_TOKENS:
+        return jsonify({"error": "node_auth_not_configured"}), 403
+    token = _node_token_from_request()
+    if not token or NODE_TOKENS.get(node_id) != token:
+        return jsonify({"error": "auth_failed"}), 403
+    return None
+
+
+def _rate_limit_node(node_id: str) -> bool:
+    if NODE_RATE_LIMIT_SECONDS <= 0:
+        return False
+    now = time.time()
+    with NODE_LOCK:
+        last_ts = NODE_RATE_LIMIT.get(node_id, 0.0)
+        if now - last_ts < NODE_RATE_LIMIT_SECONDS:
+            return True
+        NODE_RATE_LIMIT[node_id] = now
+    return False
+
+
+def _rate_limit_node_commands(node_id: str) -> bool:
+    if NODE_COMMAND_RATE_LIMIT_SECONDS <= 0:
+        return False
+    now = time.time()
+    with NODE_LOCK:
+        last_ts = NODE_COMMAND_RATE_LIMIT.get(node_id, 0.0)
+        if now - last_ts < NODE_COMMAND_RATE_LIMIT_SECONDS:
+            return True
+        NODE_COMMAND_RATE_LIMIT[node_id] = now
+    return False
+
+
+def _register_node(node_id: str, zone: Optional[str], status: Any, remote_addr: Optional[str], ts: float) -> None:
+    with NODE_LOCK:
+        entry = NODE_REGISTRY.setdefault(node_id, {"node_id": node_id})
+        entry["last_seen_ts"] = ts
+        if zone:
+            entry["zone"] = zone
+        if remote_addr:
+            entry["last_ip"] = remote_addr
+        if isinstance(status, dict):
+            entry["status"] = status
+
+
+def _prune_node_commands(node_id: str, queue: List[Dict[str, Any]], now: float) -> List[Dict[str, Any]]:
+    pruned: List[Dict[str, Any]] = []
+    for cmd in queue:
+        ttl = cmd.get("ttl_s")
+        try:
+            ttl_s = NODE_COMMAND_DEFAULT_TTL_SECONDS if ttl is None else int(ttl)
+        except (TypeError, ValueError):
+            ttl_s = NODE_COMMAND_DEFAULT_TTL_SECONDS
+        created_raw = cmd.get("created_ts", now)
+        try:
+            created_ts = float(created_raw)
+        except (TypeError, ValueError):
+            created_ts = now
+        if ttl_s > 0 and now - created_ts > ttl_s:
+            log_event("node", "warning", "Node command expired", {"node_id": node_id, "cmd_id": cmd.get("cmd_id")})
+            continue
+        pruned.append(cmd)
+    return pruned
+
+
+def _apply_node_acks(node_id: str, ack_ids: Any) -> Tuple[List[str], List[Dict[str, str]]]:
+    if not ack_ids:
+        return [], []
+    if not isinstance(ack_ids, list):
+        return [], [{"code": "invalid_ack", "detail": "acks must be list"}]
+    ack_list = [str(item).strip() for item in ack_ids if str(item).strip()]
+    if not ack_list:
+        return [], []
+    errors: List[Dict[str, str]] = []
+    acked_cmds: List[Dict[str, Any]] = []
+    with NODE_LOCK:
+        queue = NODE_COMMANDS.get(node_id, [])
+        now = time.time()
+        queue = _prune_node_commands(node_id, queue, now)
+        queue_by_id = {str(cmd.get("cmd_id")): cmd for cmd in queue}
+        unknown = [ack for ack in ack_list if ack not in queue_by_id]
+        for ack in unknown:
+            errors.append({"code": "unknown_ack", "detail": f"unknown cmd_id {ack}"})
+        for ack in ack_list:
+            cmd = queue_by_id.get(ack)
+            if cmd:
+                acked_cmds.append(cmd)
+        queue = [cmd for cmd in queue if str(cmd.get("cmd_id")) not in ack_list]
+        NODE_COMMANDS[node_id] = queue
+    for cmd in acked_cmds:
+        _record_node_actuator_state(node_id, cmd)
+    accepted = [ack for ack in ack_list if ack not in unknown]
+    return accepted, errors
+
+
+def _record_node_actuator_state(node_id: str, cmd: Dict[str, Any]) -> None:
+    actuator_id = str(cmd.get("actuator_id") or "").strip()
+    if not actuator_id:
+        return
+    action = str(cmd.get("action") or "").strip().lower()
+    state_raw = cmd.get("state")
+    duty_raw = cmd.get("duty_pct")
+    duty_pct = None
+    if duty_raw is not None:
+        try:
+            duty_pct = float(duty_raw)
+        except (TypeError, ValueError):
+            duty_pct = None
+    resolved_state: Optional[str] = None
+    if action == "set_pwm":
+        if duty_pct is None:
+            return
+        resolved_state = "on" if duty_pct > 0 else "off"
+    else:
+        if isinstance(state_raw, bool):
+            resolved_state = "on" if state_raw else "off"
+        elif isinstance(state_raw, str):
+            candidate = state_raw.strip().lower()
+            if candidate in ("on", "off"):
+                resolved_state = candidate
+    if not resolved_state:
+        return
+    with NODE_LOCK:
+        NODE_ACTUATOR_STATE[actuator_id] = {
+            "node_id": node_id,
+            "state": resolved_state,
+            "duty_pct": duty_pct,
+            "last_change_ts": time.time(),
+        }
+
+
+def _lookup_node_actuator_state(actuator_id: str) -> Optional[Dict[str, Any]]:
+    with NODE_LOCK:
+        entry = NODE_ACTUATOR_STATE.get(actuator_id)
+        if not entry:
+            return None
+        return dict(entry)
+
+
+def _node_actuator_state_on(actuator_id: str) -> bool:
+    entry = _lookup_node_actuator_state(actuator_id)
+    if not entry:
+        return False
+    last_change = _coerce_float(entry.get("last_change_ts"))
+    if last_change and NODE_STALE_SECONDS > 0:
+        if time.time() - last_change > NODE_STALE_SECONDS:
+            return False
+    return str(entry.get("state")) == "on"
+
+
+def _record_node_sensor_snapshot(node_id: str, zone: Optional[str], ts: float, sensors: List[Any]) -> None:
+    if not sensors:
+        return
+    for entry in sensors:
+        if not isinstance(entry, dict):
+            continue
+        source = entry.get("id") or entry.get("source")
+        if not source:
+            continue
+        metric = entry.get("metric")
+        if not isinstance(metric, str) or not metric.strip():
+            continue
+        value_raw = entry.get("value")
+        value = _coerce_float(value_raw)
+        if value_raw is not None and value is None:
+            continue
+        quality = entry.get("quality")
+        if quality is not None and not isinstance(quality, str):
+            quality = None
+        source_id = str(source)
+        metric_key = metric.strip().lower()
+        with NODE_LOCK:
+            snapshot = NODE_SENSOR_STATE.setdefault(source_id, {"sensor_id": source_id})
+            snapshot["node_id"] = node_id
+            if zone:
+                snapshot["zone"] = zone
+            snapshot["last_ts"] = ts
+            metrics = snapshot.setdefault("metrics", {})
+            metrics[metric_key] = {"value": value, "quality": quality, "ts": ts}
+
+
+def _lookup_node_sensor_metrics(sensor_id: str) -> Optional[Dict[str, Any]]:
+    with NODE_LOCK:
+        entry = NODE_SENSOR_STATE.get(sensor_id)
+        if not entry:
+            return None
+        metrics = entry.get("metrics")
+        return {
+            "metrics": dict(metrics) if isinstance(metrics, dict) else {},
+            "last_ts": entry.get("last_ts"),
+            "node_id": entry.get("node_id"),
+            "zone": entry.get("zone"),
+        }
+
+
+def _snapshot_node_commands(node_id: str, since_ts: Optional[float]) -> List[Dict[str, Any]]:
+    with NODE_LOCK:
+        queue = NODE_COMMANDS.get(node_id, [])
+        now = time.time()
+        queue = _prune_node_commands(node_id, queue, now)
+        NODE_COMMANDS[node_id] = queue
+        filtered: List[Dict[str, Any]] = []
+        for cmd in queue:
+            created_raw = cmd.get("created_ts", 0.0)
+            try:
+                created_ts = float(created_raw)
+            except (TypeError, ValueError):
+                created_ts = 0.0
+            if since_ts and created_ts <= since_ts:
+                continue
+            filtered.append(
+                {
+                    "cmd_id": cmd.get("cmd_id"),
+                    "actuator_id": cmd.get("actuator_id"),
+                    "action": cmd.get("action"),
+                    "state": cmd.get("state"),
+                    "duty_pct": cmd.get("duty_pct"),
+                    "ttl_s": cmd.get("ttl_s"),
+                }
+            )
+        return filtered
+
+
+def _enqueue_node_command(node_id: str, command: Dict[str, Any]) -> Tuple[str, int, List[str]]:
+    now = time.time()
+    cmd = dict(command)
+    cmd["cmd_id"] = uuid.uuid4().hex
+    cmd["created_ts"] = now
+    if cmd.get("ttl_s") is None:
+        cmd["ttl_s"] = NODE_COMMAND_DEFAULT_TTL_SECONDS
+    dropped: List[str] = []
+    with NODE_LOCK:
+        queue = NODE_COMMANDS.get(node_id, [])
+        queue = _prune_node_commands(node_id, queue, now)
+        queue.append(cmd)
+        max_queue = NODE_COMMAND_MAX_QUEUE
+        if max_queue > 0 and len(queue) > max_queue:
+            overflow = len(queue) - max_queue
+            dropped = [str(item.get("cmd_id")) for item in queue[:overflow]]
+            queue = queue[overflow:]
+        NODE_COMMANDS[node_id] = queue
+        queue_size = len(queue)
+    log_event(
+        "node",
+        "info",
+        "Node command queued",
+        {
+            "node_id": node_id,
+            "cmd_id": cmd["cmd_id"],
+            "actuator_id": cmd.get("actuator_id"),
+            "action": cmd.get("action"),
+            "state": cmd.get("state"),
+            "duty_pct": cmd.get("duty_pct"),
+        },
+    )
+    if dropped:
+        log_event(
+            "node",
+            "warning",
+            "Node command queue trimmed",
+            {"node_id": node_id, "dropped_ids": dropped},
+        )
+    return cmd["cmd_id"], queue_size, dropped
+
+
+def _clear_node_command_queue(node_id: str, reason: str) -> None:
+    with NODE_LOCK:
+        NODE_COMMANDS[node_id] = []
+    log_event("node", "warning", "Node command queue cleared", {"node_id": node_id, "reason": reason})
+
+
+def _clear_all_node_command_queues(reason: str) -> None:
+    cleared = 0
+    with NODE_LOCK:
+        for node_id, queue in NODE_COMMANDS.items():
+            if queue:
+                cleared += len(queue)
+            NODE_COMMANDS[node_id] = []
+    if cleared:
+        log_event("node", "warning", "All node command queues cleared", {"reason": reason, "cleared": cleared})
+
+
+def _queue_remote_emergency_stop() -> Dict[str, Dict[str, Any]]:
+    if not isinstance(catalog_config, dict):
+        return {}
+    catalog_actuators = catalog_config.get("actuators")
+    if not isinstance(catalog_actuators, list):
+        return {}
+    queued: Dict[str, Dict[str, Any]] = {}
+    cleared_nodes: set[str] = set()
+    for entry in catalog_actuators:
+        if not isinstance(entry, dict):
+            continue
+        backend = str(entry.get("backend") or "").lower()
+        if backend != "esp32":
+            continue
+        node_id = str(entry.get("node_id") or "").strip()
+        if not node_id:
+            continue
+        actuator_id = str(entry.get("id") or entry.get("legacy_name") or entry.get("name") or "").strip()
+        if not actuator_id:
+            continue
+        if node_id not in cleared_nodes:
+            _clear_node_command_queue(node_id, "emergency_stop")
+            cleared_nodes.add(node_id)
+        supports_pwm = bool(entry.get("supports_pwm"))
+        action = "set_pwm" if supports_pwm else "set_state"
+        duty_pct = 0.0 if supports_pwm else None
+        cmd_id, _queue_size, dropped = _enqueue_node_command(
+            node_id,
+            {
+                "actuator_id": actuator_id,
+                "action": action,
+                "state": "off",
+                "duty_pct": duty_pct,
+            },
+        )
+        node_entry = queued.setdefault(node_id, {"queued": 0})
+        node_entry["queued"] += 1
+        node_entry.setdefault("cmd_ids", []).append(cmd_id)
+        if dropped:
+            node_entry.setdefault("dropped", []).extend(dropped)
+    return queued
+
+
+def _log_telemetry_rows(node_id: str, zone: Optional[str], ts: float, sensors: List[Any]) -> Tuple[int, List[Dict[str, str]]]:
+    rows: List[Tuple[Any, ...]] = []
+    errors: List[Dict[str, str]] = []
+    for idx, entry in enumerate(sensors):
+        if not isinstance(entry, dict):
+            errors.append({"code": "invalid_sensor", "detail": f"sensors[{idx}] not object"})
+            continue
+        metric = entry.get("metric")
+        if not isinstance(metric, str) or not metric.strip():
+            errors.append({"code": "invalid_sensor", "detail": f"sensors[{idx}] missing metric"})
+            continue
+        value_raw = entry.get("value")
+        value = _coerce_float(value_raw)
+        if value_raw is not None and value is None:
+            errors.append({"code": "invalid_sensor", "detail": f"sensors[{idx}] value not number"})
+            continue
+        unit = entry.get("unit")
+        if unit is not None and not isinstance(unit, str):
+            errors.append({"code": "invalid_sensor", "detail": f"sensors[{idx}] unit not string"})
+            continue
+        source = entry.get("id") or entry.get("source")
+        if source is not None:
+            source = str(source)
+        quality = entry.get("quality")
+        if quality is not None and not isinstance(quality, str):
+            errors.append({"code": "invalid_sensor", "detail": f"sensors[{idx}] quality not string"})
+            continue
+        rows.append((ts, node_id, zone, metric.strip(), value, unit, source, quality))
+
+    if not rows:
+        return 0, errors
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        cur.executemany(
+            """
+            INSERT INTO telemetry_log (ts, node_id, zone, metric, value, unit, source, quality)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
+        conn.commit()
+        conn.close()
+    except Exception as exc:
+        errors.append({"code": "db_error", "detail": str(exc)})
+        return 0, errors
+    return len(rows), errors
 
 
 def _coerce_float(value: Any) -> Optional[float]:
@@ -2599,6 +3197,53 @@ def _sensor_health_snapshot() -> Dict[str, Any]:
             "offline_seconds": offline_seconds,
             "offline_limit_seconds": offline_limit_seconds,
         }
+
+    if isinstance(catalog_config, dict):
+        catalog_sensors = catalog_config.get("sensors")
+        if isinstance(catalog_sensors, list):
+            for sensor in catalog_sensors:
+                if not isinstance(sensor, dict):
+                    continue
+                sensor_id = str(sensor.get("id") or "").strip()
+                if not sensor_id or sensor_id in health:
+                    continue
+                backend = str(sensor.get("backend") or "").lower()
+                is_remote = backend == "esp32" or bool(sensor.get("node_id"))
+                if not is_remote:
+                    continue
+                snapshot = _lookup_node_sensor_metrics(sensor_id)
+                metrics = snapshot.get("metrics") if snapshot else None
+                metrics_map = metrics if isinstance(metrics, dict) else {}
+                last_seen_ts = _coerce_float(snapshot.get("last_ts")) if snapshot else None
+                status = "missing"
+                if metrics_map:
+                    status = _merge_metric_status(list(metrics_map.values()))
+                if last_seen_ts and NODE_STALE_SECONDS > 0 and now - last_seen_ts > NODE_STALE_SECONDS:
+                    status = "missing"
+                last_ok_ts = _sensor_last_ok_ts.get(sensor_id)
+                if status in ("ok", "simulated"):
+                    last_ok_ts = last_seen_ts or last_ok_ts or now
+                    _sensor_last_ok_ts[sensor_id] = last_ok_ts
+                first_seen_ts = _sensor_first_seen_ts.get(sensor_id) or last_seen_ts or now
+                _sensor_first_seen_ts.setdefault(sensor_id, first_seen_ts)
+                offline_seconds = None
+                if status in ("ok", "simulated"):
+                    offline_seconds = 0.0
+                else:
+                    reference = last_ok_ts or first_seen_ts
+                    if reference:
+                        offline_seconds = max(0.0, now - reference)
+                health[sensor_id] = {
+                    "label": str(sensor.get("label") or sensor_id),
+                    "status": status,
+                    "last_seen_ts": last_seen_ts,
+                    "last_ok_ts": last_ok_ts,
+                    "first_seen_ts": first_seen_ts,
+                    "offline_seconds": offline_seconds,
+                    "offline_limit_seconds": offline_limit_seconds,
+                    "zone": sensor.get("zone"),
+                    "node_id": sensor.get("node_id"),
+                }
     return health
 
 
@@ -2708,6 +3353,437 @@ def _sensor_status_error(status: Optional[str]) -> bool:
     return bool(status) and status not in ("ok", "simulated")
 
 
+def _legacy_catalog_snapshot() -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
+    zone_id = "sera"
+    zones = [{"id": zone_id, "label": "SERA"}]
+
+    sensors: List[Dict[str, Any]] = []
+    dht_gpio = sensors_config.get("dht22_gpio")
+    sensors.append(
+        {
+            "id": f"{zone_id}-dht22",
+            "label": f"{zone_id.upper()} DHT22",
+            "zone": zone_id,
+            "kind": "dht22",
+            "purpose": "temp_hum",
+            "gpio": dht_gpio,
+        }
+    )
+    if sensors_config.get("ds18b20_enabled", True):
+        sensors.append(
+            {
+                "id": f"{zone_id}-ds18b20",
+                "label": f"{zone_id.upper()} DS18B20",
+                "zone": zone_id,
+                "kind": "ds18b20",
+                "purpose": "temp",
+            }
+        )
+    bh_addr = sensors_config.get("bh1750_addr")
+    if bh_addr:
+        sensors.append(
+            {
+                "id": f"{zone_id}-bh1750",
+                "label": f"{zone_id.upper()} BH1750",
+                "zone": zone_id,
+                "kind": "bh1750",
+                "purpose": "lux",
+                "i2c_addr": bh_addr,
+            }
+        )
+    ads_addr = sensors_config.get("ads1115_addr")
+    if ads_addr:
+        for ch in ("ch0", "ch1", "ch2", "ch3"):
+            sensors.append(
+                {
+                    "id": f"{zone_id}-soil-{ch}",
+                    "label": f"{zone_id.upper()} Soil {ch.upper()}",
+                    "zone": zone_id,
+                    "kind": "ads1115",
+                    "purpose": "soil",
+                    "i2c_addr": ads_addr,
+                    "ads_channel": ch,
+                }
+            )
+
+    actuators: List[Dict[str, Any]] = []
+    for chan in channel_config:
+        name = str(chan.get("name") or "").strip()
+        if not name:
+            continue
+        label = str(chan.get("description") or "").strip() or name
+        entry: Dict[str, Any] = {
+            "id": name.upper(),
+            "label": label,
+            "zone": zone_id,
+            "role": str(chan.get("role") or "other").lower(),
+            "backend": "pi_gpio",
+            "gpio_pin": chan.get("gpio_pin"),
+            "active_low": bool(chan.get("active_low", False)),
+            "legacy_name": name.upper(),
+        }
+        for key in ("power_w", "quantity", "voltage_v", "notes", "description", "safe_default"):
+            if key in chan:
+                entry[key] = chan[key]
+        actuators.append(entry)
+
+    return zones, sensors, actuators
+
+
+def _metric_pick(metrics: Dict[str, Any], keys: List[str]) -> Optional[Dict[str, Any]]:
+    for key in keys:
+        entry = metrics.get(key)
+        if isinstance(entry, dict):
+            return entry
+    return None
+
+
+def _quality_to_status(quality: Optional[str]) -> str:
+    if quality is None or quality in ("ok", "simulated"):
+        return "ok"
+    if quality in ("missing", "disabled"):
+        return quality
+    return "error"
+
+
+def _merge_metric_status(entries: List[Optional[Dict[str, Any]]]) -> str:
+    statuses = [_quality_to_status(entry.get("quality")) for entry in entries if entry]
+    if not statuses:
+        return "missing"
+    if "error" in statuses:
+        return "error"
+    if "missing" in statuses:
+        return "missing"
+    if "disabled" in statuses:
+        return "disabled"
+    return "ok"
+
+
+def _apply_sensor_status(sensor: Dict[str, Any], readings: Dict[str, Any]) -> None:
+    sensor_id = str(sensor.get("id") or "").strip()
+    node_id = sensor.get("node_id")
+    backend = str(sensor.get("backend") or "").lower()
+    if sensor_id and (node_id or backend == "esp32"):
+        snapshot = _lookup_node_sensor_metrics(sensor_id)
+        if snapshot:
+            metrics = snapshot.get("metrics") or {}
+            last_ts = _coerce_float(snapshot.get("last_ts"))
+            if last_ts and NODE_STALE_SECONDS > 0 and time.time() - last_ts > NODE_STALE_SECONDS:
+                sensor["status"] = "missing"
+                return
+            kind = str(sensor.get("kind") or "")
+            purpose = str(sensor.get("purpose") or "")
+            if kind in ("dht11", "dht22", "sht31") or purpose == "temp_hum":
+                temp_entry = _metric_pick(metrics, ["temp_c", "temperature", "temp"])
+                hum_entry = _metric_pick(metrics, ["rh_pct", "humidity", "hum"])
+                status = _merge_metric_status([temp_entry, hum_entry])
+                if temp_entry or hum_entry:
+                    sensor["status"] = status
+                    sensor["last_value"] = {
+                        "temperature": temp_entry.get("value") if temp_entry else None,
+                        "humidity": hum_entry.get("value") if hum_entry else None,
+                        "ts": last_ts,
+                    }
+                    return
+            elif kind == "ds18b20" or purpose == "temp":
+                temp_entry = _metric_pick(metrics, ["temp_c", "temperature", "temp"])
+                status = _merge_metric_status([temp_entry])
+                if temp_entry:
+                    sensor["status"] = status
+                    sensor["last_value"] = {"temperature": temp_entry.get("value"), "ts": last_ts}
+                    return
+            elif kind in ("bh1750", "ldr") or purpose == "lux":
+                lux_entry = _metric_pick(metrics, ["lux", "light", "lux_lm"])
+                status = _merge_metric_status([lux_entry])
+                if lux_entry:
+                    sensor["status"] = status
+                    sensor["last_value"] = {"lux": lux_entry.get("value"), "ts": last_ts}
+                    return
+            elif kind == "ads1115" or purpose == "soil":
+                raw_entry = _metric_pick(metrics, ["soil_raw", "soil", "raw"])
+                status = _merge_metric_status([raw_entry])
+                if raw_entry:
+                    sensor["status"] = status
+                    sensor["last_value"] = {"raw": raw_entry.get("value"), "ts": last_ts}
+                    return
+            elif metrics:
+                metric_name = next(iter(metrics.keys()))
+                entry = metrics.get(metric_name) or {}
+                sensor["status"] = _merge_metric_status([entry])
+                sensor["last_value"] = {"metric": metric_name, "value": entry.get("value"), "ts": last_ts}
+                return
+        sensor["status"] = "missing"
+        return
+
+    kind = str(sensor.get("kind") or "")
+    status = None
+    last_value: Optional[Dict[str, Any]] = None
+    if kind in ("dht11", "dht22"):
+        entry = readings.get("dht22") or {}
+        status = entry.get("status")
+        last_value = {
+            "temperature": entry.get("temperature"),
+            "humidity": entry.get("humidity"),
+            "ts": entry.get("ts"),
+        }
+    elif kind == "ds18b20":
+        entry = readings.get("ds18b20") or {}
+        status = entry.get("status")
+        last_value = {"temperature": entry.get("temperature"), "ts": entry.get("ts")}
+    elif kind == "bh1750":
+        entry = readings.get("bh1750") or {}
+        status = entry.get("status")
+        last_value = {"lux": entry.get("lux"), "ts": entry.get("ts")}
+    elif kind == "ads1115":
+        entry = readings.get("soil") or {}
+        status = entry.get("status")
+        channel = str(sensor.get("ads_channel") or "ch0").lower()
+        last_value = {"raw": entry.get(channel), "ts": entry.get("ts")}
+
+    if status is None:
+        status = "missing"
+    sensor["status"] = status
+    if last_value is not None:
+        sensor["last_value"] = last_value
+
+
+def _apply_actuator_state(actuator: Dict[str, Any], actuator_state: Dict[str, Any]) -> None:
+    candidates: List[str] = []
+    for key in ("id", "legacy_name", "name"):
+        value = actuator.get(key)
+        if isinstance(value, str) and value.strip():
+            candidates.append(value.strip())
+            candidates.append(value.strip().upper())
+    state_entry: Optional[Dict[str, Any]] = None
+    for key in candidates:
+        if key in actuator_state:
+            state_entry = actuator_state.get(key)
+            break
+    if state_entry is None and "gpio_pin" in actuator:
+        pin = actuator.get("gpio_pin")
+        for entry in actuator_state.values():
+            if entry.get("gpio_pin") == pin:
+                state_entry = entry
+                break
+    if not state_entry:
+        for candidate in candidates:
+            remote_entry = _lookup_node_actuator_state(candidate)
+            if remote_entry:
+                actuator["state"] = str(remote_entry.get("state")) == "on"
+                actuator["last_change_ts"] = remote_entry.get("last_change_ts")
+                actuator["reason"] = "remote_ack"
+                if remote_entry.get("duty_pct") is not None:
+                    actuator["duty_pct"] = remote_entry.get("duty_pct")
+                return
+        return
+    actuator["state"] = state_entry.get("state")
+    actuator["last_change_ts"] = state_entry.get("last_change_ts")
+    actuator["reason"] = state_entry.get("reason")
+
+
+def _node_registry_snapshot() -> List[Dict[str, Any]]:
+    now = time.time()
+    with NODE_LOCK:
+        entries = [dict(entry) for entry in NODE_REGISTRY.values()]
+        queue_sizes: Dict[str, int] = {}
+        for node_id, queue in NODE_COMMANDS.items():
+            pruned = _prune_node_commands(node_id, queue, now)
+            NODE_COMMANDS[node_id] = pruned
+            queue_sizes[node_id] = len(pruned)
+    stale_threshold = NODE_STALE_SECONDS if NODE_STALE_SECONDS > 0 else None
+    for entry in entries:
+        last_seen = _coerce_float(entry.get("last_seen_ts"))
+        data_age = None
+        if last_seen:
+            data_age = max(0.0, now - last_seen)
+        if last_seen is None:
+            status = "unknown"
+        elif stale_threshold is not None and data_age is not None and data_age > stale_threshold:
+            status = "missing"
+        else:
+            status = "ok"
+        entry["health"] = {
+            "status": status,
+            "data_age_sec": data_age,
+            "stale_threshold_sec": stale_threshold,
+        }
+        node_id = entry.get("node_id")
+        if node_id:
+            entry["queue_size"] = queue_sizes.get(node_id, 0)
+    return entries
+
+
+def _zone_first_snapshot(readings: Dict[str, Any], actuator_state: Dict[str, Any]) -> Dict[str, Any]:
+    source = "legacy"
+    zones: List[Dict[str, Any]]
+    sensors: List[Dict[str, Any]]
+    actuators: List[Dict[str, Any]]
+    version = 0
+    if isinstance(catalog_config, dict):
+        source = "catalog"
+        version = int(catalog_config.get("version") or 0)
+        zones = [dict(z) for z in catalog_config.get("zones", []) if isinstance(z, dict)]
+        sensors = [dict(s) for s in catalog_config.get("sensors", []) if isinstance(s, dict)]
+        actuators = [dict(a) for a in catalog_config.get("actuators", []) if isinstance(a, dict)]
+    else:
+        zones, sensors, actuators = _legacy_catalog_snapshot()
+
+    zone_map: Dict[str, Dict[str, Any]] = {}
+    for zone in zones:
+        zid = zone.get("id")
+        if isinstance(zid, str) and zid.strip():
+            zone_entry = dict(zone)
+            zone_entry.setdefault("sensors", [])
+            zone_entry.setdefault("actuators", [])
+            zone_map[zid] = zone_entry
+
+    for sensor in sensors:
+        _apply_sensor_status(sensor, readings)
+        zid = sensor.get("zone")
+        if isinstance(zid, str) and zid in zone_map:
+            zone_map[zid]["sensors"].append(sensor.get("id"))
+
+    for actuator in actuators:
+        _apply_actuator_state(actuator, actuator_state)
+        zid = actuator.get("zone")
+        if isinstance(zid, str) and zid in zone_map:
+            zone_map[zid]["actuators"].append(actuator.get("id"))
+
+    return {
+        "source": source,
+        "version": version,
+        "zones": list(zone_map.values()),
+        "sensors": sensors,
+        "actuators": actuators,
+        "nodes": _node_registry_snapshot(),
+    }
+
+
+def _safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _actuator_daily_seconds(name: str) -> float:
+    cutoff = datetime.now(timezone.utc) - timedelta(days=1)
+    cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT SUM(seconds)
+            FROM actuator_log
+            WHERE name = ?
+              AND state = 'on'
+              AND seconds IS NOT NULL
+              AND ts >= ?
+            """,
+            (name, cutoff_str),
+        )
+        row = cur.fetchone()
+        return float(row[0] or 0)
+    except Exception:
+        return 0.0
+    finally:
+        conn.close()
+
+
+def _is_actuator_role(name: str, role: str, chan: Dict[str, Any], meta: Optional[Dict[str, Any]]) -> bool:
+    target = role.lower()
+    if str(chan.get("role") or "").lower() == target:
+        return True
+    if meta and str(meta.get("role") or "").lower() == target:
+        return True
+    if target == "pump":
+        return "PUMP" in name
+    if target == "heater":
+        return "HEATER" in name
+    return False
+
+
+def _find_catalog_actuator(name: str) -> Optional[Dict[str, Any]]:
+    if not isinstance(catalog_config, dict):
+        return None
+    candidates = catalog_config.get("actuators")
+    if not isinstance(candidates, list):
+        return None
+    target = name.upper()
+    target_pin = None
+    chan = actuator_manager.channels.get(target)
+    if chan:
+        target_pin = chan.get("gpio_pin")
+    for entry in candidates:
+        if not isinstance(entry, dict):
+            continue
+        for key in ("id", "legacy_name", "name"):
+            value = entry.get(key)
+            if isinstance(value, str) and value.strip().upper() == target:
+                return entry
+        if target_pin is not None and entry.get("gpio_pin") == target_pin:
+            return entry
+    return None
+
+
+def _resolve_catalog_channel_name(entry: Dict[str, Any]) -> Optional[str]:
+    for key in ("legacy_name", "name", "id"):
+        value = entry.get(key)
+        if isinstance(value, str) and value.strip():
+            candidate = value.strip().upper()
+            if candidate in actuator_manager.channels:
+                return candidate
+    gpio_pin = entry.get("gpio_pin")
+    if gpio_pin is None:
+        return None
+    for name, info in actuator_manager.channels.items():
+        if info.get("gpio_pin") == gpio_pin:
+            return name
+    return None
+
+
+def _fan_dependency_satisfied(entry: Dict[str, Any]) -> bool:
+    if not entry.get("requires_fan_dependency"):
+        return True
+    role = str(entry.get("role") or "").lower()
+    if role.startswith("fan"):
+        return True
+    zone_id = entry.get("zone")
+    if not zone_id or not isinstance(catalog_config, dict):
+        return False
+    catalog_actuators = catalog_config.get("actuators")
+    if not isinstance(catalog_actuators, list):
+        return False
+    fan_roles = {"fan", "fan_canopy", "fan_box", "fan_exhaust"}
+    fan_candidates = [
+        act
+        for act in catalog_actuators
+        if isinstance(act, dict)
+        and act.get("zone") == zone_id
+        and str(act.get("role") or "").lower() in fan_roles
+    ]
+    if not fan_candidates:
+        return False
+    state_snapshot = actuator_manager.get_state()
+    for fan_entry in fan_candidates:
+        channel_name = _resolve_catalog_channel_name(fan_entry)
+        if not channel_name:
+            channel_name = None
+        if state_snapshot.get(channel_name, {}).get("state"):
+            return True
+        actuator_id = None
+        if isinstance(fan_entry.get("id"), str) and fan_entry.get("id"):
+            actuator_id = fan_entry.get("id")
+        elif isinstance(fan_entry.get("legacy_name"), str) and fan_entry.get("legacy_name"):
+            actuator_id = fan_entry.get("legacy_name")
+        elif isinstance(fan_entry.get("name"), str) and fan_entry.get("name"):
+            actuator_id = fan_entry.get("name")
+        if actuator_id and _node_actuator_state_on(actuator_id):
+            return True
+    return False
+
+
 def _record_sensor_alert(key: str, label: str, status: Optional[str], action: Optional[str] = None) -> None:
     now = time.time()
     state = _sensor_alert_state.get(key, {})
@@ -2744,8 +3820,10 @@ def _record_threshold_alert(key: str, active: bool, message_on: str, message_off
 
 def _force_off_by_tag(tag: str, reason: str) -> None:
     state_snapshot = actuator_manager.get_state()
+    target = tag.lower()
     for name, info in state_snapshot.items():
-        if tag in name and info.get("state"):
+        role = str(info.get("role") or "").lower()
+        if (tag in name or role == target) and info.get("state"):
             actuator_manager.set_state(name, False, reason)
             log_actuation(name, False, reason, None)
 
@@ -2887,25 +3965,46 @@ def _check_stale_and_fail_safe() -> None:
     if not ts:
         return
     if time.time() - ts > SENSOR_STALE_SECONDS:
-        risky = [n for n in actuator_manager.channels if "PUMP" in n or "HEATER" in n]
+        risky = []
+        for name, info in actuator_manager.channels.items():
+            role = str(info.get("role") or "").lower()
+            if role in ("pump", "heater"):
+                risky.append(name)
+                continue
+            if "PUMP" in name or "HEATER" in name:
+                risky.append(name)
         for name in risky:
             actuator_manager.set_state(name, False, "stale_sensors")
         alerts.add("warning", "Sensor data stale; risky actuators turned off")
 
 
-def apply_actuator_command(name: str, desired_state: bool, seconds: Optional[int], reason: str) -> None:
+def apply_actuator_command(name: str, desired_state: bool, seconds: Optional[int], reason: str) -> Optional[int]:
     name = name.upper()
     if app_state.estop:
         raise ActuationError("E-STOP active")
     if app_state.safe_mode:
         raise ActuationError("SAFE MODE active")
-    if desired_state and "PUMP" in name and app_state.sensor_faults.get("pump"):
-        raise ActuationError("Pump locked: soil sensor error")
-    if desired_state and "HEATER" in name and app_state.sensor_faults.get("heater"):
-        raise ActuationError("Heater locked: temperature sensor error")
     chan = actuator_manager.channels.get(name)
     if not chan:
         raise ActuationError("Unknown actuator")
+    meta = _find_catalog_actuator(name)
+    is_pump = _is_actuator_role(name, "pump", chan, meta)
+    is_heater = _is_actuator_role(name, "heater", chan, meta)
+    if desired_state and is_pump and app_state.sensor_faults.get("pump"):
+        raise ActuationError("Pump locked: soil sensor error")
+    if desired_state and is_heater and app_state.sensor_faults.get("heater"):
+        raise ActuationError("Heater locked: temperature sensor error")
+    max_on_s = _safe_int(meta.get("max_on_s"), 0) if meta else 0
+    max_daily_s = _safe_int(meta.get("max_daily_s"), 0) if meta else 0
+    cooldown_s = _safe_int(meta.get("cooldown_s"), 0) if meta else 0
+    if max_on_s < 0:
+        max_on_s = 0
+    if max_daily_s < 0:
+        max_daily_s = 0
+    if cooldown_s < 0:
+        cooldown_s = 0
+    if desired_state and meta and not _fan_dependency_satisfied(meta):
+        raise ActuationError("Fan required by safety policy")
     current_state = actuator_manager.state.get(name, {}).get("state")
     if desired_state and current_state:
         raise ActuationError("Already on")
@@ -2913,18 +4012,24 @@ def apply_actuator_command(name: str, desired_state: bool, seconds: Optional[int
     if seconds_param is not None and seconds_param <= 0:
         raise ActuationError("Seconds must be positive")
     limits = app_state.limits
-    if desired_state and "PUMP" in name:
+    if desired_state and is_pump:
         if seconds_param is None:
             raise ActuationError("Pump requires seconds")
         if seconds_param <= 0:
             raise ActuationError("Seconds must be positive")
-        if seconds_param > limits.get("pump_max_seconds", 15):
+        max_allowed = limits.get("pump_max_seconds", 15)
+        if max_on_s > 0:
+            max_allowed = min(max_allowed, max_on_s)
+        if seconds_param > max_allowed:
             raise ActuationError("Pump duration exceeds max")
         cooldown = limits.get("pump_cooldown_seconds", 60)
-        if time.time() - actuator_manager.last_pump_stop_ts < cooldown:
-            remaining = int(cooldown - (time.time() - actuator_manager.last_pump_stop_ts))
+        if cooldown_s > 0:
+            cooldown = max(cooldown, cooldown_s)
+        last_stop = actuator_manager.last_stop_ts.get(name) or actuator_manager.last_pump_stop_ts
+        if last_stop and time.time() - last_stop < cooldown:
+            remaining = int(cooldown - (time.time() - last_stop))
             raise ActuationError(f"Pump cooldown {remaining}s")
-    if desired_state and "HEATER" in name:
+    if desired_state and is_heater:
         cutoff = float(limits.get("heater_cutoff_temp", 0) or 0)
         if cutoff > 0:
             latest = sensor_manager.latest()
@@ -2948,8 +4053,27 @@ def apply_actuator_command(name: str, desired_state: bool, seconds: Optional[int
         if seconds_param is None:
             seconds_param = max_heater
         seconds_param = min(seconds_param, max_heater)
+    if desired_state and max_on_s > 0:
+        if seconds_param is None:
+            seconds_param = max_on_s
+        else:
+            seconds_param = min(seconds_param, max_on_s)
+    if desired_state and max_daily_s > 0:
+        used_seconds = _actuator_daily_seconds(name)
+        remaining = max_daily_s - used_seconds
+        remaining_seconds = int(remaining)
+        if remaining_seconds <= 0:
+            raise ActuationError("Daily limit reached")
+        if seconds_param is None or seconds_param > remaining_seconds:
+            seconds_param = remaining_seconds
+    if desired_state and cooldown_s > 0 and not is_pump:
+        last_stop = actuator_manager.last_stop_ts.get(name)
+        if last_stop and time.time() - last_stop < cooldown_s:
+            remaining = int(cooldown_s - (time.time() - last_stop))
+            raise ActuationError(f"Cooldown {remaining}s")
     actuator_manager.set_state(name, desired_state, reason, seconds_param)
     log_actuation(name, desired_state, reason, seconds_param)
+    return seconds_param
 
 
 # Test panel helpers
@@ -3004,48 +4128,82 @@ if not DISABLE_BACKGROUND_LOOPS:
 # Routes
 @app.route("/")
 def index() -> Any:
+    if USE_NEW_UI:
+        return redirect(url_for("overview"))
     return redirect(url_for("dashboard"))
+
+
+@app.route("/overview")
+def overview() -> Any:
+    if not USE_NEW_UI:
+        return redirect(url_for("dashboard"))
+    return render_template("overview.html")
+
+
+@app.route("/zones")
+def zones() -> Any:
+    if not USE_NEW_UI:
+        return redirect(url_for("dashboard"))
+    return render_template("zones.html")
 
 
 @app.route("/dashboard")
 def dashboard() -> Any:
+    if USE_NEW_UI:
+        return redirect(url_for("overview"))
     return render_template("dashboard.html")
 
 
 @app.route("/control")
 def control() -> Any:
+    if USE_NEW_UI:
+        return render_template("control_v1.html")
     return render_template("control.html")
 
 
 @app.route("/settings")
 def settings() -> Any:
-    return render_template("settings.html")
+    base_template = "base_v1.html" if USE_NEW_UI else "base.html"
+    return render_template("settings.html", base_template=base_template)
+
+
+@app.route("/more")
+def more_page() -> Any:
+    if not USE_NEW_UI:
+        return redirect(url_for("dashboard"))
+    return render_template("more.html")
 
 
 @app.route("/logs")
 def logs() -> Any:
+    if USE_NEW_UI:
+        return render_template("logs_v1.html")
     return render_template("logs.html")
 
 
 @app.route("/hardware")
 def hardware() -> Any:
-    return render_template("hardware.html")
+    base_template = "base_v1.html" if USE_NEW_UI else "base.html"
+    return render_template("hardware.html", base_template=base_template)
 
 
 @app.route("/lcd")
 def lcd_page() -> Any:
-    return render_template("lcd.html")
+    base_template = "base_v1.html" if USE_NEW_UI else "base.html"
+    return render_template("lcd.html", base_template=base_template)
 
 
 @app.route("/help")
 @app.route("/sss")
 def help_page() -> Any:
-    return render_template("help.html")
+    base_template = "base_v1.html" if USE_NEW_UI else "base.html"
+    return render_template("help.html", base_template=base_template, use_new_ui=USE_NEW_UI)
 
 
 @app.route("/updates")
 def updates_page() -> Any:
-    return render_template("updates.html")
+    base_template = "base_v1.html" if USE_NEW_UI else "base.html"
+    return render_template("updates.html", base_template=base_template)
 
 
 @app.route("/reports/daily")
@@ -3058,11 +4216,14 @@ def reports_daily_page() -> Any:
     if target_date is None:
         target_date = _default_report_date(cfg)
     report = build_daily_report(target_date, profile, cfg)
+    base_template = "base_v1.html" if USE_NEW_UI else "base.html"
     return render_template(
         "reports_daily.html",
         report=report,
         target_date=target_date.isoformat(),
         profile=profile or report.get("profile", {}).get("name"),
+        base_template=base_template,
+        use_new_ui=USE_NEW_UI,
     )
 
 
@@ -3076,11 +4237,14 @@ def reports_weekly_page() -> Any:
     if end_date is None:
         end_date = _default_report_date(cfg)
     report = build_weekly_report(end_date, profile, cfg)
+    base_template = "base_v1.html" if USE_NEW_UI else "base.html"
     return render_template(
         "reports_weekly.html",
         report=report,
         end_date=end_date.isoformat(),
         profile=profile or report.get("config", {}).get("ACTIVE_PROFILE"),
+        base_template=base_template,
+        use_new_ui=USE_NEW_UI,
     )
 
 
@@ -3107,12 +4271,20 @@ def api_status_payload(readings: Optional[Dict[str, Any]] = None) -> Dict[str, A
     data_stale = data_age_sec is not None and data_age_sec > SENSOR_STALE_SECONDS
     cooldowns: Dict[str, float] = {}
     pump_cooldown = int(app_state.limits.get("pump_cooldown_seconds", 60))
-    remaining = 0.0
-    if actuator_manager.last_pump_stop_ts:
-        remaining = max(0.0, pump_cooldown - (time.time() - actuator_manager.last_pump_stop_ts))
-    for name in actuator_manager.channels:
-        if "PUMP" in name:
+    now_ts = time.time()
+    for name, info in actuator_manager.channels.items():
+        role = str(info.get("role") or "").lower()
+        is_pump = role == "pump" or "PUMP" in name
+        if is_pump:
+            last_stop = actuator_manager.last_stop_ts.get(name)
+            if not last_stop:
+                last_stop = actuator_manager.last_pump_stop_ts
+            remaining = 0.0
+            if last_stop:
+                remaining = max(0.0, pump_cooldown - (now_ts - last_stop))
             cooldowns[name] = round(remaining, 1)
+    actuator_state = actuator_manager.get_state()
+    zone_snapshot = _zone_first_snapshot(readings, actuator_state)
     return {
         "timestamp": _timestamp(),
         "sensor_ts": sensor_ts,
@@ -3120,7 +4292,7 @@ def api_status_payload(readings: Optional[Dict[str, Any]] = None) -> Dict[str, A
         "data_stale": data_stale,
         "stale_threshold_sec": SENSOR_STALE_SECONDS,
         "sensor_readings": readings,
-        "actuator_state": actuator_manager.get_state(),
+        "actuator_state": actuator_state,
         "cooldowns": cooldowns,
         "sensor_faults": app_state.get_sensor_faults(),
         "sensor_health": _sensor_health_snapshot(),
@@ -3134,6 +4306,12 @@ def api_status_payload(readings: Optional[Dict[str, Any]] = None) -> Dict[str, A
         "lcd": lcd_manager.status(),
         "notifications": notifications.public_status(),
         "retention": retention_manager.public_status(),
+        "zones": zone_snapshot["zones"],
+        "sensors": zone_snapshot["sensors"],
+        "actuators": zone_snapshot["actuators"],
+        "nodes": zone_snapshot["nodes"],
+        "catalog": {"source": zone_snapshot["source"], "version": zone_snapshot["version"]},
+        "compat": {"deprecated_fields": ["sensor_readings", "actuator_state", "automation_state"]},
     }
 
 
@@ -3141,6 +4319,11 @@ def api_status_payload(readings: Optional[Dict[str, Any]] = None) -> Dict[str, A
 def api_status() -> Any:
     response = api_status_payload()
     return jsonify(response)
+
+
+@app.route("/api/nodes")
+def api_nodes() -> Any:
+    return jsonify({"nodes": _node_registry_snapshot()})
 
 
 @app.route("/api/updates")
@@ -3169,6 +4352,153 @@ def api_retention_cleanup() -> Any:
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
     return jsonify({"ok": True})
+
+
+@app.route("/api/telemetry", methods=["POST"])
+def api_telemetry() -> Any:
+    payload = request.get_json(force=True, silent=True) or {}
+    node_id = str(payload.get("node_id") or "").strip()
+    if not node_id:
+        return jsonify({"error": "node_id required"}), 400
+    auth_error = _require_node_auth(node_id)
+    if auth_error:
+        return auth_error
+    if _rate_limit_node(node_id):
+        return jsonify({"error": "rate_limited"}), 429
+
+    sensors = payload.get("sensors") or []
+    if not isinstance(sensors, list):
+        return jsonify({"error": "sensors must be list"}), 400
+
+    ts_raw = payload.get("ts")
+    ts = _parse_ts_param(str(ts_raw)) if ts_raw is not None else None
+    if ts is None:
+        ts = time.time()
+
+    zone_raw = payload.get("zone")
+    zone = str(zone_raw).strip() if zone_raw else None
+
+    acks, ack_errors = _apply_node_acks(node_id, payload.get("acks"))
+    row_count, errors = _log_telemetry_rows(node_id, zone, ts, sensors)
+    errors = ack_errors + errors
+
+    _record_node_sensor_snapshot(node_id, zone, ts, sensors)
+    _register_node(node_id, zone, payload.get("status"), request.remote_addr, ts)
+    if errors:
+        log_event("node", "warning", "Telemetry errors", {"node_id": node_id, "errors": errors})
+
+    status_code = 200
+    if errors:
+        status_code = 207 if row_count > 0 else 400
+    return jsonify({"acks": acks, "errors": errors}), status_code
+
+
+@app.route("/api/node_commands", methods=["GET", "POST"])
+def api_node_commands() -> Any:
+    if request.method == "POST":
+        admin_error = require_admin()
+        if admin_error:
+            return admin_error
+        payload = request.get_json(force=True, silent=True) or {}
+        node_id = str(payload.get("node_id") or "").strip()
+        actuator_id = str(payload.get("actuator_id") or "").strip()
+        if not node_id:
+            return jsonify({"error": "node_id required"}), 400
+        if not actuator_id:
+            return jsonify({"error": "actuator_id required"}), 400
+        meta = _find_catalog_actuator(actuator_id)
+        if meta:
+            backend = str(meta.get("backend") or "")
+            if backend and backend != "esp32":
+                return jsonify({"error": "actuator backend not supported"}), 400
+            expected_node = str(meta.get("node_id") or "").strip()
+            if expected_node and expected_node != node_id:
+                return jsonify({"error": "node_id mismatch"}), 400
+
+        action_raw = payload.get("action")
+        action = str(action_raw).strip().lower() if action_raw else ""
+        duty_raw = payload.get("duty_pct")
+        state_raw = payload.get("state")
+        if not action:
+            action = "set_pwm" if duty_raw is not None else "set_state"
+        if action not in ("set_state", "set_pwm"):
+            return jsonify({"error": "invalid action"}), 400
+
+        state = None
+        if isinstance(state_raw, bool):
+            state = "on" if state_raw else "off"
+        elif isinstance(state_raw, str):
+            candidate = state_raw.strip().lower()
+            if candidate in ("on", "off"):
+                state = candidate
+
+        duty_pct = None
+        if action == "set_state":
+            if state is None:
+                return jsonify({"error": "state required"}), 400
+        else:
+            if duty_raw is None:
+                return jsonify({"error": "duty_pct required"}), 400
+            try:
+                duty_pct = float(duty_raw)
+            except (TypeError, ValueError):
+                return jsonify({"error": "invalid duty_pct"}), 400
+            if duty_pct < 0 or duty_pct > 100:
+                return jsonify({"error": "duty_pct out of range"}), 400
+            state = "on" if duty_pct > 0 else "off"
+
+        if app_state.estop:
+            return jsonify({"error": "E-STOP active"}), 403
+        if app_state.safe_mode:
+            return jsonify({"error": "SAFE MODE active"}), 403
+
+        ttl_raw = payload.get("ttl_s")
+        ttl_s = None
+        if ttl_raw is not None:
+            try:
+                ttl_s = int(ttl_raw)
+            except (TypeError, ValueError):
+                return jsonify({"error": "invalid ttl_s"}), 400
+            if ttl_s < 0:
+                return jsonify({"error": "invalid ttl_s"}), 400
+
+        cmd_id, queue_size, dropped = _enqueue_node_command(
+            node_id,
+            {
+                "actuator_id": actuator_id,
+                "action": action,
+                "state": state,
+                "duty_pct": duty_pct,
+                "ttl_s": ttl_s,
+            },
+        )
+        response = {"ok": True, "cmd_id": cmd_id, "queue_size": queue_size}
+        if dropped:
+            response["dropped"] = dropped
+        return jsonify(response)
+
+    node_id = str(request.args.get("node_id") or "").strip()
+    if not node_id:
+        return jsonify({"error": "node_id required"}), 400
+    auth_error = _require_node_auth(node_id)
+    if auth_error:
+        return auth_error
+    if _rate_limit_node_commands(node_id):
+        return jsonify({"error": "rate_limited"}), 429
+    if app_state.estop or app_state.safe_mode:
+        _clear_all_node_command_queues("estop_active" if app_state.estop else "safe_mode_active")
+        return "", 204
+    since_raw = request.args.get("since")
+    since_ts = _parse_ts_param(since_raw)
+    if since_raw and since_ts is None:
+        return jsonify({"error": "invalid since timestamp"}), 400
+    if since_ts is None:
+        window = NODE_COMMAND_DEFAULT_TTL_SECONDS if NODE_COMMAND_DEFAULT_TTL_SECONDS > 0 else 30
+        since_ts = time.time() - window
+    commands = _snapshot_node_commands(node_id, since_ts)
+    if not commands:
+        return "", 204
+    return jsonify({"commands": commands})
 
 
 @app.route("/api/sensor_log")
@@ -3382,6 +4712,166 @@ def api_history() -> Any:
     return jsonify({"metric": metric, "from_ts": from_ts, "to_ts": to_ts, "points": points})
 
 
+@app.route("/api/trends")
+def api_trends() -> Any:
+    metric = (request.args.get("metric") or "").strip().lower()
+    zone = (request.args.get("zone") or "").strip()
+    hours_raw = request.args.get("hours", "6")
+    max_points_raw = request.args.get("max_points")
+    format_raw = (request.args.get("format") or "").strip().lower()
+    summary_raw = (request.args.get("summary") or "").strip().lower()
+    summary_mode = summary_raw in ("1", "true", "yes")
+    try:
+        hours = int(hours_raw)
+    except ValueError:
+        return jsonify({"error": "hours must be integer"}), 400
+    hours = max(1, min(hours, 168))
+    if summary_mode:
+        max_points = 0
+    elif max_points_raw is None or max_points_raw == "":
+        max_points = 0 if format_raw == "csv" else TREND_MAX_POINTS_DEFAULT
+    else:
+        try:
+            max_points = int(max_points_raw)
+        except ValueError:
+            return jsonify({"error": "max_points must be integer"}), 400
+        max_points = max(1, min(max_points, TREND_MAX_POINTS_LIMIT))
+
+    metric_map = {
+        "temp_c": "dht_temp",
+        "rh_pct": "dht_hum",
+        "lux": "lux",
+        "soil_raw": "soil_ch0",
+    }
+    if not metric:
+        return jsonify({"error": "metric is required", "allowed": sorted(metric_map)}), 400
+    if metric not in metric_map:
+        return jsonify({"error": "invalid metric", "allowed": sorted(metric_map)}), 400
+
+    to_ts = time.time()
+    from_ts = to_ts - hours * 3600
+    if summary_mode:
+        summary = {
+            "zone": zone or None,
+            "metric": metric,
+            "from_ts": from_ts,
+            "to_ts": to_ts,
+            "count": 0,
+            "min": None,
+            "max": None,
+            "last": None,
+            "last_ts": None,
+            "source": None,
+        }
+        conn = sqlite3.connect(DB_PATH)
+        cur = conn.cursor()
+        if zone:
+            cur.execute(
+                """
+                SELECT MIN(value), MAX(value), COUNT(value)
+                FROM telemetry_log
+                WHERE zone = ? AND metric = ? AND ts >= ? AND ts <= ? AND value IS NOT NULL
+                """,
+                (zone, metric, from_ts, to_ts),
+            )
+            min_val, max_val, count_val = cur.fetchone() or (None, None, 0)
+            count_val = int(count_val or 0)
+            if count_val > 0:
+                cur.execute(
+                    """
+                    SELECT ts, value
+                    FROM telemetry_log
+                    WHERE zone = ? AND metric = ? AND ts >= ? AND ts <= ? AND value IS NOT NULL
+                    ORDER BY ts DESC LIMIT 1
+                    """,
+                    (zone, metric, from_ts, to_ts),
+                )
+                last_row = cur.fetchone()
+                if last_row:
+                    summary["last_ts"] = last_row[0]
+                    summary["last"] = last_row[1]
+                summary["min"] = min_val
+                summary["max"] = max_val
+                summary["count"] = count_val
+                summary["source"] = "telemetry"
+        if summary["count"] == 0 and (not zone or zone.lower() == "sera"):
+            column = metric_map[metric]
+            cur.execute(
+                f"""
+                SELECT MIN({column}), MAX({column}), COUNT({column})
+                FROM sensor_log
+                WHERE ts >= ? AND ts <= ? AND {column} IS NOT NULL
+                """,
+                (from_ts, to_ts),
+            )
+            min_val, max_val, count_val = cur.fetchone() or (None, None, 0)
+            count_val = int(count_val or 0)
+            if count_val > 0:
+                cur.execute(
+                    f"""
+                    SELECT ts, {column}
+                    FROM sensor_log
+                    WHERE ts >= ? AND ts <= ? AND {column} IS NOT NULL
+                    ORDER BY ts DESC LIMIT 1
+                    """,
+                    (from_ts, to_ts),
+                )
+                last_row = cur.fetchone()
+                if last_row:
+                    summary["last_ts"] = last_row[0]
+                    summary["last"] = last_row[1]
+                summary["min"] = min_val
+                summary["max"] = max_val
+                summary["count"] = count_val
+                summary["source"] = "sensor_log"
+        conn.close()
+        return jsonify(summary)
+    points: List[List[float]] = []
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+    if zone:
+        cur.execute(
+            """
+            SELECT ts, value
+            FROM telemetry_log
+            WHERE zone = ? AND metric = ? AND ts >= ? AND ts <= ?
+            ORDER BY ts ASC
+            """,
+            (zone, metric, from_ts, to_ts),
+        )
+        rows = cur.fetchall()
+        points = [[row[0], row[1]] for row in rows if row[1] is not None]
+    if not points and (not zone or zone.lower() == "sera"):
+        column = metric_map[metric]
+        cur.execute(
+            f"SELECT ts, {column} FROM sensor_log WHERE ts >= ? AND ts <= ? ORDER BY ts ASC",
+            (from_ts, to_ts),
+        )
+        rows = cur.fetchall()
+        points = [[row[0], row[1]] for row in rows if row[1] is not None]
+    conn.close()
+    points = _downsample_points(points, max_points)
+    if format_raw == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["ts", metric])
+        writer.writerows(points)
+        zone_part = zone or "sera"
+        filename = f"trends_{zone_part}_{metric}.csv"
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    return jsonify({
+        "zone": zone or None,
+        "metric": metric,
+        "from_ts": from_ts,
+        "to_ts": to_ts,
+        "points": points,
+    })
+
+
 @app.route("/api/events")
 def api_events() -> Any:
     limit_raw = request.args.get("limit", "50")
@@ -3578,12 +5068,84 @@ def api_actuator(name: str) -> Any:
     if admin_error:
         return admin_error
     payload = request.get_json(force=True, silent=True) or {}
-    desired_state = payload.get("state")
     seconds = payload.get("seconds")
-    if desired_state not in ("on", "off"):
+    desired_state = payload.get("state")
+    duty_raw = payload.get("duty_pct")
+    state = None
+    if isinstance(desired_state, bool):
+        state = "on" if desired_state else "off"
+    elif isinstance(desired_state, str):
+        candidate = desired_state.strip().lower()
+        if candidate in ("on", "off"):
+            state = candidate
+    duty_pct = None
+    if duty_raw is not None:
+        try:
+            duty_pct = float(duty_raw)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid duty_pct"}), 400
+        if duty_pct < 0 or duty_pct > 100:
+            return jsonify({"error": "duty_pct out of range"}), 400
+
+    meta = _find_catalog_actuator(name)
+    backend = str(meta.get("backend") or "").lower() if meta else ""
+    supports_pwm = bool(meta.get("supports_pwm")) if meta else False
+    if duty_pct is not None:
+        if not meta or not supports_pwm:
+            return jsonify({"error": "duty_pct not supported"}), 400
+        if state == "off" and duty_pct > 0:
+            return jsonify({"error": "state conflicts with duty_pct"}), 400
+        if state == "on" and duty_pct == 0:
+            return jsonify({"error": "state conflicts with duty_pct"}), 400
+        if backend and backend != "esp32":
+            return jsonify({"error": "duty_pct backend not supported"}), 400
+
+    if meta and backend == "esp32":
+        if app_state.estop:
+            return jsonify({"error": "E-STOP active"}), 403
+        if app_state.safe_mode:
+            return jsonify({"error": "SAFE MODE active"}), 403
+        if seconds is not None:
+            return jsonify({"error": "seconds not supported for esp32"}), 400
+        node_id = str(meta.get("node_id") or "").strip()
+        if not node_id:
+            return jsonify({"error": "node_id required"}), 400
+        actuator_id = str(meta.get("id") or name).strip()
+        action = "set_state"
+        if duty_pct is not None:
+            action = "set_pwm"
+            state = "on" if duty_pct > 0 else "off"
+        if action == "set_state" and state is None:
+            return jsonify({"error": "state must be 'on' or 'off'"}), 400
+        cmd_id, queue_size, dropped = _enqueue_node_command(
+            node_id,
+            {
+                "actuator_id": actuator_id,
+                "action": action,
+                "state": state,
+                "duty_pct": duty_pct,
+            },
+        )
+        response = {
+            "ok": True,
+            "queued": True,
+            "cmd_id": cmd_id,
+            "node_id": node_id,
+            "actuator_id": actuator_id,
+            "queue_size": queue_size,
+        }
+        if dropped:
+            response["dropped"] = dropped
+        return jsonify(response)
+
+    if meta and backend and backend != "pi_gpio":
+        return jsonify({"error": "actuator backend not supported"}), 400
+    if duty_pct is not None:
+        return jsonify({"error": "duty_pct not supported"}), 400
+    if state is None:
         return jsonify({"error": "state must be 'on' or 'off'"}), 400
     try:
-        apply_actuator_command(name, desired_state == "on", seconds, "manual")
+        apply_actuator_command(name, state == "on", seconds, "manual")
         return jsonify({"ok": True, "state": actuator_manager.get_state().get(name.upper())})
     except ActuationError as exc:
         return jsonify({"error": str(exc)}), 403
@@ -3598,7 +5160,11 @@ def api_emergency_stop() -> Any:
         return admin_error
     actuator_manager.set_all_off("emergency_stop")
     log_actuation("ALL", False, "emergency_stop", None)
-    return jsonify({"ok": True})
+    queued = _queue_remote_emergency_stop()
+    response = {"ok": True}
+    if queued:
+        response["remote_queue"] = queued
+    return jsonify(response)
 
 
 @app.route("/api/config", methods=["GET", "POST"])
@@ -3730,6 +5296,22 @@ def api_settings() -> Any:
     return jsonify({"ok": True})
 
 
+@app.route("/api/automation/override", methods=["POST"])
+def api_automation_override() -> Any:
+    admin_error = require_admin()
+    if admin_error:
+        return admin_error
+    payload = request.get_json(force=True, silent=True) or {}
+    scope = str(payload.get("scope") or "").strip().lower()
+    action = str(payload.get("action") or "clear").strip().lower()
+    if action not in ("clear", "cancel"):
+        return jsonify({"error": "invalid action"}), 400
+    if scope not in ("lux", "light", "fan", "heater", "pump", "all"):
+        return jsonify({"error": "invalid scope"}), 400
+    cleared = automation_engine.clear_manual_override(scope)
+    return jsonify({"ok": True, "cleared": cleared})
+
+
 @app.route("/api/lcd", methods=["GET", "POST"])
 def api_lcd() -> Any:
     if request.method == "GET":
@@ -3810,7 +5392,8 @@ def notes_page() -> Any:
             ],
         },
     ]
-    return render_template("notes.html", notes=note_groups)
+    base_template = "base_v1.html" if USE_NEW_UI else "base.html"
+    return render_template("notes.html", notes=note_groups, base_template=base_template)
 
 
 # Templates for testing convenience

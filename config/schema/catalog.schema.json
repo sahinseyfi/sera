@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "catalog.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "zones", "sensors", "actuators"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "zones": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/zone" }
+    },
+    "sensors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sensor" }
+    },
+    "actuators": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/actuator" }
+    },
+    "lcd": { "$ref": "#/$defs/lcd" }
+  },
+  "$defs": {
+    "zone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+        "label": { "type": "string", "minLength": 1 },
+        "node_id": { "type": "string" }
+      }
+    },
+    "sensor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "zone", "kind", "purpose"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "zone": { "type": "string", "minLength": 1 },
+        "kind": {
+          "type": "string",
+          "enum": ["dht11", "dht22", "sht31", "bh1750", "ldr", "ads1115", "ds18b20"]
+        },
+        "purpose": {
+          "type": "string",
+          "enum": ["temp_hum", "lux", "soil", "temp", "humidity"]
+        },
+        "backend": { "type": "string", "enum": ["pi_gpio", "esp32"] },
+        "node_id": { "type": "string" },
+        "gpio": { "type": "integer", "minimum": 0 },
+        "i2c_addr": { "type": "string", "pattern": "^0x[0-9A-Fa-f]+$" },
+        "ads_channel": { "type": "string", "enum": ["ch0", "ch1", "ch2", "ch3"] },
+        "status": {
+          "type": "string",
+          "enum": ["ok", "simulated", "missing", "error", "disabled"]
+        },
+        "calibration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["scale"],
+          "properties": {
+            "scale": { "type": "number" },
+            "offset": { "type": "number" }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "backend": { "const": "esp32" } } },
+          "then": { "required": ["node_id"] }
+        }
+      ]
+    },
+    "actuator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "zone", "role", "backend"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "description": { "type": "string" },
+        "zone": { "type": "string", "minLength": 1 },
+        "role": {
+          "type": "string",
+          "enum": [
+            "heater",
+            "fan",
+            "fan_canopy",
+            "fan_box",
+            "fan_exhaust",
+            "light",
+            "pump",
+            "valve",
+            "other"
+          ]
+        },
+        "backend": { "type": "string", "enum": ["pi_gpio", "esp32", "homeassistant"] },
+        "node_id": { "type": "string" },
+        "gpio_pin": { "type": "integer", "minimum": 0 },
+        "active_low": { "type": "boolean" },
+        "ha_entity_id": { "type": "string" },
+        "ha_domain": { "type": "string" },
+        "supports_pwm": { "type": "boolean" },
+        "duty_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "duty_step_max": { "type": "number", "minimum": 0 },
+        "max_current_a": { "type": "number", "minimum": 0 },
+        "power_w": { "type": "number" },
+        "quantity": { "type": "integer", "minimum": 0 },
+        "voltage_v": { "type": "number" },
+        "notes": { "type": "string" },
+        "safe_default": { "type": "boolean" },
+        "cooldown_s": { "type": "integer", "minimum": 0 },
+        "max_on_s": { "type": "integer", "minimum": 0 },
+        "max_daily_s": { "type": "integer", "minimum": 0 },
+        "requires_fan_dependency": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "backend": { "const": "pi_gpio" } } },
+          "then": { "required": ["gpio_pin", "active_low"] }
+        },
+        {
+          "if": { "properties": { "backend": { "const": "esp32" } } },
+          "then": { "required": ["node_id"] }
+        },
+        {
+          "if": { "properties": { "backend": { "const": "homeassistant" } } },
+          "then": { "required": ["ha_entity_id"] }
+        }
+      ]
+    },
+    "lcd": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lcd_enabled": { "type": "boolean" },
+        "lcd_addr": { "type": "string", "pattern": "^0x[0-9A-Fa-f]+$" },
+        "lcd_port": { "type": "integer", "minimum": 0 },
+        "lcd_cols": { "type": "integer", "minimum": 0 },
+        "lcd_rows": { "type": "integer", "minimum": 0 },
+        "lcd_expander": { "type": "string" },
+        "lcd_charmap": { "type": "string" },
+        "lcd_mode": { "type": "string" },
+        "lcd_lines": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

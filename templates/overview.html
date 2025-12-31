@@ -1,0 +1,138 @@
+{% extends 'base_v1.html' %}
+{% block content %}
+<div class="hero p-3 rounded-4 mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <p class="text-secondary mb-1">Zon odaklı özet ekranı</p>
+      <h2 class="mb-0">Genel Bakış</h2>
+    </div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary" id="refreshNow">Yenile</button>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="mb-3">Sistem Özeti</h6>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="small text-secondary">SAFE MODE</span>
+          <span id="overviewSafeMode" class="pill small">--</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="small text-secondary">Veri Yaşı</span>
+          <span id="overviewDataAge" class="small">--</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="small text-secondary">Uyarılar</span>
+          <span id="overviewAlertsCount" class="pill small">--</span>
+        </div>
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="small text-secondary">Son Güncelleme</span>
+          <span id="overviewLastUpdate" class="small">--</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="mb-3">Otomasyon & Katalog</h6>
+        <div class="row g-2">
+          <div class="col-sm-6">
+            <div class="small text-secondary">Otomasyon Durumu</div>
+            <div id="overviewAutomationState" class="fw-semibold">--</div>
+          </div>
+          <div class="col-sm-6">
+            <div class="small text-secondary">Katalog Kaynağı</div>
+            <div id="overviewCatalogMeta" class="fw-semibold">--</div>
+          </div>
+          <div class="col-sm-6">
+            <div class="small text-secondary">Aktif Müdahale</div>
+            <div id="overviewAutomationOverride" class="fw-semibold">--</div>
+          </div>
+          <div class="col-sm-6">
+            <div class="small text-secondary">Veri Yaşı Eşiği</div>
+            <div id="overviewStaleThreshold" class="fw-semibold">--</div>
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="small text-secondary mb-1">Otomasyon Özeti</div>
+          <div id="overviewAutomationList" class="small text-secondary">--</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+      <div>
+        <h6 class="mb-0">Özet</h6>
+        <div id="overviewSummaryRangeLabel" class="small text-secondary">Son 24 saat</div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <select class="form-select form-select-sm" id="overviewSummaryZone" aria-label="Zon seçimi">
+          <option value="">Genel (SERA)</option>
+        </select>
+        <div class="btn-group btn-group-sm" role="group">
+          <button class="btn btn-outline-secondary" type="button" data-summary-range="6" aria-pressed="false">6s</button>
+          <button class="btn btn-outline-secondary active" type="button" data-summary-range="24" aria-pressed="true">24s</button>
+          <button class="btn btn-outline-secondary" type="button" data-summary-range="168" aria-pressed="false">7g</button>
+        </div>
+        <select class="form-select form-select-sm" id="overviewSummaryCsvMetric" aria-label="Özet CSV metriği">
+          <option value="temp_c">Sıcaklık CSV</option>
+          <option value="rh_pct">Nem CSV</option>
+          <option value="lux">Lux CSV</option>
+          <option value="soil_raw">Toprak CSV</option>
+        </select>
+        <a class="btn btn-outline-secondary btn-sm" id="overviewSummaryCsvLink" href="#" download>CSV</a>
+        <span id="overviewSummaryUpdated" class="small text-secondary">--</span>
+      </div>
+    </div>
+    <div id="overviewSummaryGrid" class="row g-2 small text-secondary">Özet yükleniyor...</div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h6 class="mb-0">Zoneler</h6>
+      <span class="small text-secondary">Anlık durum</span>
+    </div>
+    <div id="overviewZones" class="row g-3"></div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="mb-2">Uyarılar</h6>
+        <div id="overviewAlerts" class="small text-secondary">Henüz uyarı yok.</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h6 class="mb-2">Node Durumu</h6>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <span id="overviewNodesAll" class="badge text-bg-dark" data-node-filter="all" role="button" tabindex="0" aria-pressed="false" style="cursor: pointer;">Tümü: --</span>
+          <span id="overviewNodesOk" class="badge text-bg-success" data-node-filter="ok" role="button" tabindex="0" aria-pressed="false" style="cursor: pointer;">OK: --</span>
+          <span id="overviewNodesCamera" class="badge text-bg-info" data-node-filter="camera" role="button" tabindex="0" aria-pressed="false" style="cursor: pointer;">Kamera: --</span>
+          <span id="overviewNodesMissing" class="badge text-bg-warning" data-node-filter="missing" role="button" tabindex="0" aria-pressed="false" style="cursor: pointer;">Eksik: --</span>
+          <span id="overviewNodesError" class="badge text-bg-danger" data-node-filter="error" role="button" tabindex="0" aria-pressed="false" style="cursor: pointer;">Hata: --</span>
+          <span id="overviewNodesUnknown" class="badge text-bg-secondary" data-node-filter="unknown" role="button" tabindex="0" aria-pressed="false" style="cursor: pointer;">Bilinmiyor: --</span>
+        </div>
+        <div id="overviewNodes" class="small text-secondary">Node bilgisi bekleniyor.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>window.initOverview && window.initOverview();</script>
+{% endblock %}

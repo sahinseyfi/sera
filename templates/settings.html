@@ -1,10 +1,13 @@
-{% extends 'base.html' %}
+{% extends base_template %}
 {% block content %}
 <div id="top"></div>
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <p class="text-secondary mb-1">Sistem Ayarları</p>
-    <h2 class="mb-0">SAFE MODE, Limitler, Otomasyon, Bildirimler</h2>
+<div class="hero p-3 rounded-4 mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <p class="text-secondary mb-1">Ayarlar merkezi</p>
+      <h2 class="mb-0">Ayarlar</h2>
+    </div>
+    <div class="small text-secondary">Güvenlik, otomasyon, bildirimler, veri saklama</div>
   </div>
 </div>
 
@@ -16,8 +19,40 @@
   </div>
 </div></div>
 
+<div class="card mb-3">
+  <div class="card-body">
+  <h6 class="mb-2">Özet</h6>
+    <div class="row g-2">
+      <div class="col-md-4">
+        <div class="small text-secondary">SAFE MODE</div>
+        <div id="settingsSummarySafeMode" class="fw-semibold">--</div>
+      </div>
+      <div class="col-md-4">
+        <div class="small text-secondary">Otomasyon</div>
+        <div id="settingsSummaryAutomation" class="fw-semibold">--</div>
+      </div>
+      <div class="col-md-4">
+        <div class="small text-secondary">Aktif Müdahale</div>
+        <div id="settingsSummaryOverride" class="fw-semibold">--</div>
+      </div>
+      <div class="col-md-4">
+        <div class="small text-secondary">Pompa Günlük Kullanım</div>
+        <div id="settingsSummaryPumpUsage" class="fw-semibold">--</div>
+      </div>
+      <div class="col-md-4">
+        <div class="small text-secondary">Bildirimler</div>
+        <div id="settingsSummaryNotifications" class="fw-semibold">--</div>
+      </div>
+      <div class="col-md-4">
+        <div class="small text-secondary">Veri Saklama</div>
+        <div id="settingsSummaryRetention" class="fw-semibold">--</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="card mb-3"><div class="card-body">
-  <h6>Admin PIN / Token</h6>
+  <h6>Admin Erişimi</h6>
   <p class="text-secondary small">ADMIN_TOKEN tanımlıysa buraya gir. Tarayıcıda saklanır. Token yoksa admin işlemleri sadece yerel ağdan çalışır.</p>
   <div class="row g-2 align-items-end">
     <div class="col-md-6">
@@ -31,8 +66,8 @@
 <div class="row g-3">
   <div class="col-md-6">
     <div class="card h-100" id="secSafeMode"><div class="card-body">
-      <h6>SAFE MODE</h6>
-      <p class="text-secondary small">SAFE MODE açıkken kontrol endpointleri kilitli, sadece izleme.</p>
+      <h6>Güvenlik Modu (SAFE MODE)</h6>
+      <p class="text-secondary small">SAFE MODE açıkken kontrol endpointleri kilitli, sadece izleme yapılır.</p>
       <div class="form-check form-switch">
         <input class="form-check-input" type="checkbox" role="switch" id="safeModeToggle">
         <label class="form-check-label" for="safeModeToggle">
@@ -44,7 +79,7 @@
   </div>
   <div class="col-md-6">
     <div class="card h-100" id="secLimits"><div class="card-body">
-      <h6>Limitler</h6>
+      <h6>Pompa/Isıtıcı Limitleri</h6>
       <div class="row g-2">
         <div class="col-12">
           <label class="form-label">Pompa Max Saniye
@@ -82,16 +117,16 @@
 </div>
 
 <div class="card mb-3"><div class="card-body">
-  <label class="form-label">Bölüme git</label>
+  <label class="form-label">Hızlı Geçiş</label>
   <select class="form-select" id="settingsSectionJump">
     <option value="" selected>Seç...</option>
-    <option value="secSafeMode">SAFE MODE</option>
-    <option value="secLimits">Limitler</option>
+    <option value="secSafeMode">Güvenlik Modu</option>
+    <option value="secLimits">Pompa/Isıtıcı Limitleri</option>
     <option value="secAlerts">Uyarı Eşikleri</option>
-    <option value="secEnergy">Enerji Bedeli</option>
-    <option value="secLuxAutomation">Lux Otomasyonu</option>
+    <option value="secEnergy">Enerji Tarifesi</option>
+    <option value="secLuxAutomation">Işık Otomasyonu (Lux)</option>
     <option value="secHeaterAutomation">Isıtıcı Otomasyonu</option>
-    <option value="secPumpAutomation">Pompa Otomasyonu</option>
+    <option value="secPumpAutomation">Sulama Otomasyonu</option>
     <option value="secSoilCalibration">Toprak Kalibrasyonu</option>
     <option value="secFanAutomation">Fan Otomasyonu</option>
     <option value="secNotifications">Bildirimler</option>
@@ -144,7 +179,7 @@
 </div></div>
 
 <div class="card mt-3" id="secEnergy"><div class="card-body">
-  <h6>Enerji Bedeli (TL/kWh)</h6>
+  <h6>Enerji Tarifesi (TL/kWh)</h6>
   <div class="row g-2">
     <div class="col-md-4">
       <label class="form-label">Düşük Kademe
@@ -169,7 +204,7 @@
 </div></div>
 
 <div class="card mt-3" id="secLuxAutomation"><div class="card-body">
-  <h6>Lux Otomasyonu</h6>
+  <h6>Işık Otomasyonu (Lux)</h6>
   <div class="row g-2">
     <div class="col-md-3">
       <label class="form-label">Durum
@@ -234,7 +269,7 @@
       <input class="form-control" id="maxBlockMinutes" type="number" min="0" value="0">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Manuel Override (dk)
+      <label class="form-label">Manuel Müdahale (dk)
         <span class="info-icon" data-bs-toggle="tooltip" title="Manuel aç/kapat sonrası otomasyonun bekleyeceği süre.">?</span>
       </label>
       <input class="form-control" id="manualOverrideMinutes" type="number" min="0" value="0">
@@ -290,7 +325,7 @@
       <input class="form-control" id="heaterMinOffMinutes" type="number" min="0" value="2">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Manuel Override (dk)
+      <label class="form-label">Manuel Müdahale (dk)
         <span class="info-icon" data-bs-toggle="tooltip" title="Manuel müdahaleden sonra otomasyonun bekleyeceği süre.">?</span>
       </label>
       <input class="form-control" id="heaterManualOverrideMinutes" type="number" min="0" value="10">
@@ -340,7 +375,7 @@
 </div></div>
 
 <div class="card mt-3" id="secPumpAutomation"><div class="card-body">
-  <h6>Pompa Otomasyonu</h6>
+  <h6>Sulama Otomasyonu</h6>
   <div class="row g-2">
     <div class="col-md-3">
       <label class="form-label">Durum
@@ -402,7 +437,7 @@
       </div>
     </div>
     <div class="col-md-3">
-      <label class="form-label">Manuel Override (dk)
+      <label class="form-label">Manuel Müdahale (dk)
         <span class="info-icon" data-bs-toggle="tooltip" title="Manuel sulamadan sonra otomasyonun bekleyeceği süre.">?</span>
       </label>
       <input class="form-control" id="pumpManualOverrideMinutes" type="number" min="0" value="10">
@@ -411,7 +446,7 @@
 </div></div>
 
 <div class="card mt-3" id="secSoilCalibration"><div class="card-body">
-  <h6>Toprak Nem Kalibrasyonu</h6>
+  <h6>Toprak Kalibrasyonu</h6>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
       <thead>
@@ -474,7 +509,7 @@
 </div></div>
 
 <div class="card mt-3" id="secFanAutomation"><div class="card-body">
-  <h6>Nem Fan Otomasyonu</h6>
+  <h6>Fan Otomasyonu</h6>
   <div class="row g-2">
     <div class="col-md-3">
       <label class="form-label">Durum
@@ -512,7 +547,7 @@
       <input class="form-control" id="fanMinOffMinutes" type="number" min="0" value="2">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Manuel Override (dk)
+      <label class="form-label">Manuel Müdahale (dk)
         <span class="info-icon" data-bs-toggle="tooltip" title="Manuel müdahaleden sonra otomasyonun bekleyeceği süre.">?</span>
       </label>
       <input class="form-control" id="fanManualOverrideMinutes" type="number" min="0" value="10">
@@ -602,7 +637,7 @@
 </div></div>
 
 <div class="card mt-3" id="secNotifications"><div class="card-body">
-  <h6>Bildirimler (Telegram)</h6>
+  <h6>Bildirimler</h6>
   <p class="text-secondary small mb-2">
     Uyarı ve hataları Telegram’a gönderebilir. Tokenlar config içinde tutulmaz; env var ile verilir: <code>TELEGRAM_BOT_TOKEN</code>, <code>TELEGRAM_CHAT_ID</code>.
   </p>
@@ -669,21 +704,21 @@
 </div></div>
 
 <div class="card mt-3" id="secRetention"><div class="card-body">
-  <h6>Veri Saklama & Temizlik</h6>
+  <h6>Veri Saklama</h6>
   <p class="text-secondary small mb-2">
     <strong>0 gün</strong> = silme kapalı. Dikkat: silme geri alınamaz; istersen önce arşivi aç.
   </p>
   <div class="row g-2">
     <div class="col-md-3">
-      <label class="form-label">Sensör log (gün)</label>
+      <label class="form-label">Sensör kayıt (gün)</label>
       <input class="form-control" id="retentionSensorDays" type="number" min="0" value="0">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Olay log (gün)</label>
+      <label class="form-label">Olay kayıt (gün)</label>
       <input class="form-control" id="retentionEventDays" type="number" min="0" value="0">
     </div>
     <div class="col-md-3">
-      <label class="form-label">Aktüatör log (gün)</label>
+      <label class="form-label">Aktüatör kayıt (gün)</label>
       <input class="form-control" id="retentionActuatorDays" type="number" min="0" value="0">
     </div>
     <div class="col-md-3">

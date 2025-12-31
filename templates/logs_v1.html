@@ -1,0 +1,180 @@
+{% extends 'base_v1.html' %}
+{% block content %}
+<div class="hero p-3 rounded-4 mb-3">
+  <div class="d-flex justify-content-between align-items-center">
+    <div>
+      <p class="text-secondary mb-1">Geçmiş & Kayıtlar</p>
+      <h2 class="mb-0">Geçmiş</h2>
+    </div>
+    <div class="text-end">
+      <small class="text-secondary" id="sensorLogUpdated">--</small>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <h6 class="mb-1">Bu sayfa ne işe yarar?</h6>
+  <div class="small text-secondary">
+    Sensör ölçümlerini zaman aralığıyla listeler, CSV indirir. “Kayıt temizle” sadece SQLite kayıtlarını siler; CSV dosyaları kalır.
+    Trend grafikleri aşağıdaki bölümde yer alır. Detay: <a href="/help#hLoglar">Yardım/SSS</a>.
+  </div>
+</div></div>
+
+<div class="card mb-3"><div class="card-body">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h6 class="mb-1">Raporlar</h6>
+      <div class="small text-secondary">Günlük ve haftalık özetlere hızlı geçiş.</div>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary btn-sm" href="/reports/daily">Günlük</a>
+      <a class="btn btn-outline-secondary btn-sm" href="/reports/weekly">Haftalık</a>
+    </div>
+  </div>
+</div></div>
+
+<div class="card mb-3"><div class="card-body">
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-start gap-2">
+    <div>
+      <h6 class="mb-1">Trendler</h6>
+      <div class="small text-secondary" id="historyRangeLabel">Son 24 saat</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <select class="form-select form-select-sm" id="historyZone" aria-label="Zon seçimi">
+        <option value="">Genel (SERA)</option>
+      </select>
+      <select class="form-select form-select-sm" id="historyMetric" aria-label="Trend metriği">
+        <option value="temp_c">Sıcaklık</option>
+        <option value="rh_pct">Nem</option>
+        <option value="lux">Lux</option>
+        <option value="soil_raw">Toprak</option>
+      </select>
+      <div class="btn-group btn-group-sm" role="group">
+        <button class="btn btn-outline-secondary active" type="button" data-history-range="24h" aria-pressed="true">24 saat</button>
+        <button class="btn btn-outline-secondary" type="button" data-history-range="7d" aria-pressed="false">7 gün</button>
+      </div>
+      <a class="btn btn-outline-secondary btn-sm" id="historyDownload" href="#" download>CSV</a>
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 mt-2">
+    <span class="pill small" id="historyMinBadge">Min --</span>
+    <span class="pill small" id="historyMaxBadge">Max --</span>
+    <span class="pill small" id="historyLastBadge">Son --</span>
+  </div>
+  <div class="history-chart-wrap mt-3">
+    <canvas id="historyChart"></canvas>
+    <div id="historyEmpty" class="history-empty d-none">Veri yok</div>
+    <div id="historyTooltip" class="history-tooltip d-none"></div>
+  </div>
+  <div class="d-flex flex-wrap gap-3 small text-secondary mt-2">
+    <div>Min: <span id="historyMin">--</span></div>
+    <div>Max: <span id="historyMax">--</span></div>
+    <div>Son: <span id="historyLast">--</span></div>
+    <div>Örnek: <span id="historyCount">--</span></div>
+    <div>Güncelleme: <span id="historyUpdated">--</span></div>
+  </div>
+</div></div>
+
+<div class="card mb-3"><div class="card-body">
+  <div class="d-flex flex-column flex-lg-row gap-2 justify-content-between align-items-start align-items-lg-end">
+    <div class="d-flex flex-wrap gap-2 align-items-end">
+      <div>
+        <label class="form-label small text-secondary mb-1">Başlangıç</label>
+        <input class="form-control form-control-sm" id="sensorLogFrom" placeholder="ISO veya unix sn">
+      </div>
+      <div>
+        <label class="form-label small text-secondary mb-1">Bitiş</label>
+        <input class="form-control form-control-sm" id="sensorLogTo" placeholder="ISO veya unix sn">
+      </div>
+      <div>
+        <label class="form-label small text-secondary mb-1">Limit</label>
+        <input class="form-control form-control-sm" id="sensorLogLimit" type="number" min="1" max="2000" value="200">
+      </div>
+      <div>
+        <label class="form-label small text-secondary mb-1">Aralık</label>
+        <select class="form-select form-select-sm" id="sensorLogInterval">
+          <option value="">Ham</option>
+          <option value="1">1 dk</option>
+          <option value="5">5 dk</option>
+          <option value="15">15 dk</option>
+          <option value="30">30 dk</option>
+          <option value="60">1 saat</option>
+        </select>
+      </div>
+      <div>
+        <label class="form-label small text-secondary mb-1">Sıra</label>
+        <select class="form-select form-select-sm" id="sensorLogOrder">
+          <option value="desc" selected>Yeni → Eski</option>
+          <option value="asc">Eski → Yeni</option>
+        </select>
+      </div>
+      <button class="btn btn-outline-secondary btn-sm" id="sensorLogRefresh" type="button">Yenile</button>
+      <a class="btn btn-outline-secondary btn-sm" id="sensorLogDownload" href="#" download>CSV indir</a>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <button class="btn btn-outline-danger btn-sm" id="sensorLogClear" type="button">Kayıt temizle</button>
+      <small class="text-secondary" id="sensorLogNote"></small>
+    </div>
+  </div>
+</div></div>
+
+<div class="card"><div class="card-body">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle" id="sensorLogTable">
+      <thead>
+        <tr>
+          <th>Zaman</th>
+          <th>DHT °C</th>
+          <th>DHT %</th>
+          <th>DS18 °C</th>
+          <th>Lux</th>
+          <th>Toprak 0</th>
+          <th>Toprak 1</th>
+          <th>Toprak 2</th>
+          <th>Toprak 3</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <div id="sensorLogEmpty" class="small text-secondary d-none">Veri yok</div>
+</div></div>
+
+<div class="card mt-3"><div class="card-body">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h6 class="mb-0">Olay Günlüğü</h6>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <select class="form-select form-select-sm" id="eventFilterCategory">
+        <option value="">Kategori: Tümü</option>
+        <option value="actuator">Aktüatör</option>
+        <option value="automation">Otomasyon</option>
+        <option value="alert">Uyarı</option>
+        <option value="sensor">Sensör</option>
+        <option value="node">Node</option>
+        <option value="system">Sistem</option>
+        <option value="maintenance">Bakım</option>
+        <option value="sensor_log">Sensör Kaydı</option>
+      </select>
+      <select class="form-select form-select-sm" id="eventFilterRange">
+        <option value="">Aralık: Tümü</option>
+        <option value="1">Son 1 saat</option>
+        <option value="6">Son 6 saat</option>
+        <option value="24">Son 24 saat</option>
+        <option value="168">Son 7 gün</option>
+      </select>
+      <select class="form-select form-select-sm" id="eventFilterLevel">
+        <option value="">Seviye: Tümü</option>
+        <option value="info">Bilgi</option>
+        <option value="warning">Uyarı</option>
+        <option value="error">Hata</option>
+      </select>
+      <button class="btn btn-outline-secondary btn-sm" id="eventFilterRefresh" type="button">Yenile</button>
+      <small class="text-secondary" id="eventLogUpdated">--</small>
+    </div>
+  </div>
+  <div class="small text-secondary mt-1">Otomasyon, manuel komut ve uyarı kayıtları.</div>
+  <div id="eventLog" class="small mt-2"></div>
+</div></div>
+
+<script>window.initLogs && window.initLogs();</script>
+{% endblock %}

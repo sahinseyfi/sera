@@ -58,3 +58,11 @@ It is a short, stable reference for implementation and future changes.
 - Pages will be redesigned to be zone-first and simpler.
 - Mobile: tabs for zones. Desktop: blocks/grid for zones.
 - Sensor and actuator configuration should be editable from the panel.
+
+## Navigation (Serav1 beta)
+- Mobile tabbar: Genel Bakış, Zoneler, Kontrol, Geçmiş, Diğer (Ayarlar Diğer içinde).
+- Diğer grubu: Raporlar, Güncellemeler, Yardım, Donanım, LCD ve Notlar için hızlı erişim.
+- UI etiketleri Türkçe: Genel Bakış, Zoneler, Kontrol, Geçmiş, Ayarlar, Diğer.
+
+## Terminoloji (Serav1 beta)
+- Arayüzde “Log” yerine “Kayıt” kullanılır (Geçmiş & Kayıtlar).

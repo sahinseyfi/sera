@@ -321,6 +321,89 @@ def _validate_updates(cfg: Any, issues: list[Issue]) -> None:
             issues.append(Issue("ERROR", "details liste olmalı.", f"{where}.details"))
 
 
+def _validate_catalog(cfg: Any, issues: list[Issue]) -> None:
+    if not isinstance(cfg, dict):
+        issues.append(Issue("ERROR", "catalog.json bir object olmalı."))
+        return
+
+    zones = cfg.get("zones")
+    sensors = cfg.get("sensors")
+    actuators = cfg.get("actuators")
+
+    zone_ids: set[str] = set()
+    if not isinstance(zones, list):
+        issues.append(Issue("ERROR", "zones bir liste (array) olmalı.", "catalog.zones"))
+    else:
+        for idx, zone in enumerate(zones):
+            where = f"catalog.zones[{idx}]"
+            if not isinstance(zone, dict):
+                issues.append(Issue("ERROR", "zone kaydı object olmalı.", where))
+                continue
+            zid = zone.get("id")
+            if not isinstance(zid, str) or not zid.strip():
+                issues.append(Issue("ERROR", "zone.id zorunlu (string).", where))
+                continue
+            if zid in zone_ids:
+                issues.append(Issue("ERROR", f"zone.id tekrarı: {zid}", where))
+            zone_ids.add(zid)
+
+    if not isinstance(sensors, list):
+        issues.append(Issue("ERROR", "sensors bir liste (array) olmalı.", "catalog.sensors"))
+    else:
+        seen_sensor_ids: set[str] = set()
+        for idx, sensor in enumerate(sensors):
+            where = f"catalog.sensors[{idx}]"
+            if not isinstance(sensor, dict):
+                issues.append(Issue("ERROR", "sensor kaydı object olmalı.", where))
+                continue
+            sid = sensor.get("id")
+            if not isinstance(sid, str) or not sid.strip():
+                issues.append(Issue("ERROR", "sensor.id zorunlu (string).", where))
+                continue
+            if sid in seen_sensor_ids:
+                issues.append(Issue("ERROR", f"sensor.id tekrarı: {sid}", where))
+            seen_sensor_ids.add(sid)
+            zone = sensor.get("zone")
+            if isinstance(zone, str) and zone_ids and zone not in zone_ids:
+                issues.append(Issue("ERROR", f"sensor.zone tanımsız: {zone}", where))
+            backend = sensor.get("backend")
+            if backend is not None:
+                if backend not in ("pi_gpio", "esp32"):
+                    issues.append(Issue("ERROR", "sensor.backend geçersiz.", where))
+                if backend == "esp32" and not sensor.get("node_id"):
+                    issues.append(Issue("ERROR", "sensor.backend=esp32 için node_id zorunlu.", where))
+
+    if not isinstance(actuators, list):
+        issues.append(Issue("ERROR", "actuators bir liste (array) olmalı.", "catalog.actuators"))
+    else:
+        seen_actuator_ids: set[str] = set()
+        for idx, actuator in enumerate(actuators):
+            where = f"catalog.actuators[{idx}]"
+            if not isinstance(actuator, dict):
+                issues.append(Issue("ERROR", "actuator kaydı object olmalı.", where))
+                continue
+            aid = actuator.get("id")
+            if not isinstance(aid, str) or not aid.strip():
+                issues.append(Issue("ERROR", "actuator.id zorunlu (string).", where))
+                continue
+            if aid in seen_actuator_ids:
+                issues.append(Issue("ERROR", f"actuator.id tekrarı: {aid}", where))
+            seen_actuator_ids.add(aid)
+            backend = actuator.get("backend")
+            if backend not in ("pi_gpio", "esp32", "homeassistant"):
+                issues.append(Issue("ERROR", "actuator.backend geçersiz.", where))
+            if backend == "pi_gpio":
+                if actuator.get("gpio_pin") is None or "active_low" not in actuator:
+                    issues.append(Issue("ERROR", "backend=pi_gpio için gpio_pin + active_low zorunlu.", where))
+            if backend == "esp32" and not actuator.get("node_id"):
+                issues.append(Issue("ERROR", "backend=esp32 için node_id zorunlu.", where))
+            if backend == "homeassistant" and not actuator.get("ha_entity_id"):
+                issues.append(Issue("ERROR", "backend=homeassistant için ha_entity_id zorunlu.", where))
+            zone = actuator.get("zone")
+            if isinstance(zone, str) and zone_ids and zone not in zone_ids:
+                issues.append(Issue("ERROR", f"actuator.zone tanımsız: {zone}", where))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="AKILLI SERA repo hızlı doğrulama (config + şema).")
     parser.add_argument("--strict", action="store_true", help="Uyarıları da hata gibi değerlendir.")
@@ -358,6 +441,20 @@ def main() -> int:
             custom_validator(cfg, issues)
         except Exception as exc:
             issues.append(Issue("ERROR", f"Özel doğrulama çöktü: {exc}", filename))
+
+    catalog_path = config_dir / "catalog.json"
+    if catalog_path.exists():
+        catalog_cfg = _load_json(catalog_path, issues)
+        if catalog_cfg is not None:
+            schema_path = schema_dir / "catalog.schema.json"
+            if schema_path.exists():
+                _schema_validate(catalog_cfg, schema_path, issues)
+            else:
+                issues.append(Issue("WARN", "Şema dosyası yok (schema validation atlandı).", str(schema_path)))
+            try:
+                _validate_catalog(catalog_cfg, issues)
+            except Exception as exc:
+                issues.append(Issue("ERROR", f"Özel doğrulama çöktü: {exc}", "catalog.json"))
 
     errors = [i for i in issues if i.level == "ERROR"]
     warns = [i for i in issues if i.level == "WARN"]

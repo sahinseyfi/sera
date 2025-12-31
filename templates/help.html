@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends base_template %}
 {% block content %}
 <div class="hero p-3 rounded-4 mb-3">
   <div class="d-flex justify-content-between align-items-center">
@@ -7,7 +7,7 @@
       <h2 class="mb-0">SSS (Sık Sorulan Sorular)</h2>
     </div>
     <div class="text-end">
-      <a class="btn btn-outline-secondary btn-sm" href="/dashboard">Dashboard</a>
+      <a class="btn btn-outline-secondary btn-sm" href="{{ '/overview' if use_new_ui else '/dashboard' }}">{{ 'Genel Bakış' if use_new_ui else 'Dashboard' }}</a>
     </div>
   </div>
 </div>
@@ -29,7 +29,13 @@
     </h2>
     <div id="cGenel" class="accordion-collapse collapse show" aria-labelledby="hGenel" data-bs-parent="#faqAccordion">
       <div class="accordion-body small">
-        <p class="mb-2"><strong>Bu panel ne yapar?</strong><br>Dashboard anlık sensörleri ve özetleri gösterir. Kontrol sayfası röleleri güvenli şekilde aç/kapatır. Ayarlar sayfası SAFE MODE/limit/otomasyon ayarlarını yönetir. Pin Mapping, kanal→GPIO eşleşmesini düzenler. Loglar sayfası kayıtlı sensör ölçümlerini listeler ve CSV indirir.</p>
+        <p class="mb-2"><strong>Bu panel ne yapar?</strong><br>
+          {% if use_new_ui %}
+            Genel Bakış anlık sensörleri ve özetleri gösterir. Kontrol sayfası röleleri güvenli şekilde aç/kapatır. Ayarlar sayfası SAFE MODE/limit/otomasyon ayarlarını yönetir. Donanım (Pin Eşlemesi) kanal→GPIO eşleşmesini düzenler. Geçmiş sayfası kayıtlı sensör ölçümlerini listeler ve CSV indirir.
+          {% else %}
+            Dashboard anlık sensörleri ve özetleri gösterir. Kontrol sayfası röleleri güvenli şekilde aç/kapatır. Ayarlar sayfası SAFE MODE/limit/otomasyon ayarlarını yönetir. Pin Mapping, kanal→GPIO eşleşmesini düzenler. Loglar sayfası kayıtlı sensör ölçümlerini listeler ve CSV indirir.
+          {% endif %}
+        </p>
         <p class="mb-0"><strong>“SIM / OK / HATA / YOK” ne demek?</strong><br><span class="pill">OK</span> gerçek okuma, <span class="pill">SIM</span> simülasyon/kitaplık yok, <span class="pill">HATA</span> okuma hatası, <span class="pill">YOK</span> sensör bulunamadı veya erişilemiyor.</p>
       </div>
     </div>
@@ -38,14 +44,26 @@
   <div class="accordion-item">
     <h2 class="accordion-header" id="hDashboard">
       <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cDashboard" aria-expanded="false" aria-controls="cDashboard">
-        Dashboard (İzleme)
+        {{ 'Genel Bakış (İzleme)' if use_new_ui else 'Dashboard (İzleme)' }}
       </button>
     </h2>
     <div id="cDashboard" class="accordion-collapse collapse" aria-labelledby="hDashboard" data-bs-parent="#faqAccordion">
       <div class="accordion-body small">
-        <p class="mb-2"><strong>Veri gecikmesi / stale nedir?</strong><br>Üst barda “Veri gecikmesi” son sensör okumasının kaç saniye önce alındığını gösterir. Gecikme <code>SENSOR_STALE_SECONDS</code> üstüne çıkarsa “stale” sayılır ve güvenlik mantıkları devreye girebilir.</p>
-        <p class="mb-2"><strong>Grafikler neyi gösterir?</strong><br>Grafikler, sensör logundan seçtiğin metrik için (son 24 saat / 7 gün) zaman serisini gösterir. “CSV” linki aynı veriyi dışa aktarır.</p>
-        <p class="mb-0"><strong>Olay Günlüğü nedir?</strong><br>Sistemin önemli olaylarını (aktüatör komutları, uyarılar, otomasyon sebepleri vb.) listeler.</p>
+        <p class="mb-2"><strong>Veri yaşı / stale nedir?</strong><br>Üst barda “Veri yaşı” son sensör okumasının kaç saniye önce alındığını gösterir. Yaş <code>SENSOR_STALE_SECONDS</code> üstüne çıkarsa “stale” sayılır ve güvenlik mantıkları devreye girebilir.</p>
+        <p class="mb-2"><strong>Grafikler neyi gösterir?</strong><br>
+          {% if use_new_ui %}
+            Geçmiş sayfasındaki grafikler, seçtiğin metrik için (son 24 saat / 7 gün) zaman serisini gösterir. “CSV” linki aynı veriyi dışa aktarır.
+          {% else %}
+            Grafikler, sensör logundan seçtiğin metrik için (son 24 saat / 7 gün) zaman serisini gösterir. “CSV” linki aynı veriyi dışa aktarır.
+          {% endif %}
+        </p>
+        <p class="mb-0"><strong>Olay Günlüğü nedir?</strong><br>
+          {% if use_new_ui %}
+            Geçmiş sayfasında, sistemin önemli olaylarını (aktüatör komutları, uyarılar, otomasyon sebepleri vb.) listeler.
+          {% else %}
+            Sistemin önemli olaylarını (aktüatör komutları, uyarılar, otomasyon sebepleri vb.) listeler.
+          {% endif %}
+        </p>
       </div>
     </div>
   </div>
@@ -75,9 +93,22 @@
       <div class="accordion-body small">
         <p class="mb-2"><strong>Admin Token nedir?</strong><br><code>ADMIN_TOKEN</code> ortam değişkeni tanımlıysa, admin işlemleri için tarayıcıdan token girmen gerekir. Token yoksa admin işlemleri sadece yerel ağdan (LAN) kabul edilir.</p>
         <p class="mb-2"><strong>Limitler ne işe yarar?</strong><br>Pompa/ısıtıcı gibi riskli çıkışlara süre ve soğuma (cooldown) sınırı koyar. Isıtıcı için ayrıca “üst limit” sıcaklıkta otomatik kesme uygulanır.</p>
-        <p class="mb-2"><strong>Otomasyon nasıl çalışır?</strong><br>Lux/ısıtıcı/pompa otomasyonları, pencere saatleri, hedef süreler ve “override/blok/min kapalı” kurallarıyla çalışır. Detaylar Dashboard’daki “Otomasyon Durumu” özetinde görülür.</p>
+        <p class="mb-2"><strong>Otomasyon nasıl çalışır?</strong><br>
+          Lux/ısıtıcı/pompa otomasyonları, pencere saatleri, hedef süreler ve “müdahale/blok/min kapalı” kurallarıyla çalışır.
+          {% if use_new_ui %}
+            Detaylar Genel Bakış’taki otomasyon özetinde ve Kontrol kartlarında görülür.
+          {% else %}
+            Detaylar Dashboard’daki “Otomasyon Durumu” özetinde görülür.
+          {% endif %}
+        </p>
         <p class="mb-2"><strong>Bildirimler (Telegram) nasıl çalışır?</strong><br>Uyarı/hata mesajları Telegram’a gönderilebilir. Tokenlar config dosyasına yazılmaz; <code>TELEGRAM_BOT_TOKEN</code> ve <code>TELEGRAM_CHAT_ID</code> env var ile verilir. Ayarlar sayfasından seviye/cooldown/test mesajı yönetilir.</p>
-        <p class="mb-0"><strong>Veri saklama (retention) ne yapar?</strong><br>Logların kaç gün saklanacağını belirler. <strong>0 gün</strong> seçilirse silme kapalıdır. Arşiv açıksa temizlikten önce DB/CSV arşive kopyalanır.</p>
+        <p class="mb-0"><strong>Veri saklama (retention) ne yapar?</strong><br>
+          {% if use_new_ui %}
+            Kayıtların kaç gün saklanacağını belirler. <strong>0 gün</strong> seçilirse silme kapalıdır. Arşiv açıksa temizlikten önce DB/CSV arşive kopyalanır.
+          {% else %}
+            Logların kaç gün saklanacağını belirler. <strong>0 gün</strong> seçilirse silme kapalıdır. Arşiv açıksa temizlikten önce DB/CSV arşive kopyalanır.
+          {% endif %}
+        </p>
       </div>
     </div>
   </div>
@@ -85,7 +116,7 @@
   <div class="accordion-item">
     <h2 class="accordion-header" id="hPin">
       <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cPin" aria-expanded="false" aria-controls="cPin">
-        Pin Mapping (GPIO & Röle Kanalları)
+        {{ 'Donanım (GPIO & Röle Kanalları)' if use_new_ui else 'Pin Mapping (GPIO & Röle Kanalları)' }}
       </button>
     </h2>
     <div id="cPin" class="accordion-collapse collapse" aria-labelledby="hPin" data-bs-parent="#faqAccordion">
@@ -99,14 +130,14 @@
   <div class="accordion-item">
     <h2 class="accordion-header" id="hLoglar">
       <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cLoglar" aria-expanded="false" aria-controls="cLoglar">
-        Loglar (Sensör Kayıtları)
+        {{ 'Geçmiş (Sensör Kayıtları)' if use_new_ui else 'Loglar (Sensör Kayıtları)' }}
       </button>
     </h2>
     <div id="cLoglar" class="accordion-collapse collapse" aria-labelledby="hLoglar" data-bs-parent="#faqAccordion">
       <div class="accordion-body small">
-        <p class="mb-2"><strong>Loglar nerede tutuluyor?</strong><br>İki yerde: (1) SQLite: <code>data/sera.db</code> tablosu <code>sensor_log</code> (2) Günlük CSV: <code>data/sensor_logs/sensor_log_YYYY-MM-DD.csv</code></p>
+        <p class="mb-2"><strong>{{ 'Geçmiş kayıtları nerede tutuluyor?' if use_new_ui else 'Loglar nerede tutuluyor?' }}</strong><br>İki yerde: (1) SQLite: <code>data/sera.db</code> tablosu <code>sensor_log</code> (2) Günlük CSV: <code>data/sensor_logs/sensor_log_YYYY-MM-DD.csv</code></p>
         <p class="mb-2"><strong>CSV indir ne indirir?</strong><br>Seçtiğin zaman aralığına göre SQLite’daki satırları CSV olarak indirir.</p>
-        <p class="mb-0"><strong>Log temizle ne yapar?</strong><br>Admin yetkisiyle SQLite’daki sensör logunu temizler (tamamı veya “Başlangıç” alanına yazılan tarihten önce). CSV dosyaları silinmez.</p>
+        <p class="mb-0"><strong>{{ 'Kayıt temizle ne yapar?' if use_new_ui else 'Log temizle ne yapar?' }}</strong><br>Admin yetkisiyle SQLite’daki sensör logunu temizler (tamamı veya “Başlangıç” alanına yazılan tarihten önce). CSV dosyaları silinmez.</p>
       </div>
     </div>
   </div>
@@ -119,9 +150,9 @@
     </h2>
     <div id="cSorun" class="accordion-collapse collapse" aria-labelledby="hSorun" data-bs-parent="#faqAccordion">
       <div class="accordion-body small">
-        <p class="mb-2"><strong>Dashboard’da sensörler “YOK/HATA” görünüyor</strong><br>I2C/1-Wire etkin mi, kütüphaneler kurulu mu, pin/addr doğru mu kontrol et. Simülasyon modunda <span class="pill">SIM</span> görünmesi normaldir.</p>
-        <p class="mb-2"><strong>Röleler ters çalışıyor</strong><br>Pin Mapping’de ilgili kanal için <em>Active Low</em> kutusunu kontrol et.</p>
-        <p class="mb-0"><strong>Loglar boş</strong><br>Sensörlerin durumunun <span class="pill">OK</span> veya <span class="pill">SIM</span> olması gerekir; ayrıca log interval nedeniyle birkaç saniye gecikmeli yazılabilir.</p>
+        <p class="mb-2"><strong>{{ 'Genel Bakış' if use_new_ui else 'Dashboard' }}’ta sensörler “YOK/HATA” görünüyor</strong><br>I2C/1-Wire etkin mi, kütüphaneler kurulu mu, pin/addr doğru mu kontrol et. Simülasyon modunda <span class="pill">SIM</span> görünmesi normaldir.</p>
+        <p class="mb-2"><strong>Röleler ters çalışıyor</strong><br>{{ 'Donanım' if use_new_ui else 'Pin Mapping' }} sayfasında ilgili kanal için <em>Active Low</em> kutusunu kontrol et.</p>
+        <p class="mb-0"><strong>{{ 'Geçmiş kayıtları boş' if use_new_ui else 'Loglar boş' }}</strong><br>Sensörlerin durumunun <span class="pill">OK</span> veya <span class="pill">SIM</span> olması gerekir; ayrıca kayıt aralığı nedeniyle birkaç saniye gecikmeli yazılabilir.</p>
       </div>
     </div>
   </div>

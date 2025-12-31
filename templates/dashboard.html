@@ -40,7 +40,7 @@
       <div class="small">Kalan: <span id="autoRemainingMinutes">--</span></div>
       <div class="small">Pencere: <span id="autoWindowState">--</span></div>
       <div class="small">Reset: <span id="autoResetTime">--</span></div>
-      <div class="small">Override: <span id="autoOverrideState">--</span></div>
+      <div class="small">Müdahale: <span id="autoOverrideState">--</span></div>
       <div class="small">Blok: <span id="autoBlockState">--</span></div>
       <div class="small">Min Kapalı: <span id="autoMinOffState">--</span></div>
       <div class="small">Son kapanma: <span id="autoLastOffReason">--</span></div>
@@ -48,7 +48,7 @@
   </div>
   <div class="d-flex flex-wrap gap-2 small text-secondary mt-2">
     <span class="badge text-bg-success">Aktif (pencere içinde)</span>
-    <span class="badge text-bg-warning">Override / Blok</span>
+    <span class="badge text-bg-warning">Müdahale / Blok</span>
     <span class="badge text-bg-danger">Lux hatası</span>
     <span class="badge text-bg-info">Lux max / Min kapalı</span>
     <span class="badge text-bg-secondary">Kapalı</span>
@@ -121,8 +121,8 @@
         <option value="soil_ch3">Toprak CH3</option>
       </select>
       <div class="btn-group btn-group-sm" role="group">
-        <button class="btn btn-outline-secondary active" type="button" data-history-range="24h">24 saat</button>
-        <button class="btn btn-outline-secondary" type="button" data-history-range="7d">7 gün</button>
+        <button class="btn btn-outline-secondary active" type="button" data-history-range="24h" aria-pressed="true">24 saat</button>
+        <button class="btn btn-outline-secondary" type="button" data-history-range="7d" aria-pressed="false">7 gün</button>
       </div>
       <a class="btn btn-outline-secondary btn-sm" id="historyDownload" href="#" download>CSV</a>
     </div>

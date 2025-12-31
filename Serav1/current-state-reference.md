@@ -17,80 +17,90 @@ as a reference before the upcoming redesign.
 
 ## UI Pages (Current)
 
+### Serav1 Beta UI (USE_NEW_UI=1)
+- Genel Bakış: zon odaklı özet, otomasyon ve node sağlığı görünümü.
+- Zoneler: zon kartları + mini trendler.
+- Kontrol: zon odaklı manuel kontrol + güvenlik onay akışları.
+- Geçmiş: trend grafikleri + olay günlüğü (filtreli) + rapor kısayolları.
+- Ayarlar: SAFE MODE ve otomasyon özetleri.
+- Diğer: Ayarlar/Raporlar/Güncellemeler/Yardım/Donanım/LCD/Notlar için hızlı erişim.
+- Ortak base: `base_v1.html` (Serav1 navigasyon + mobil tabbar).
+- UI etiketleri Türkçe (Genel Bakış/Zoneler/Kontrol/Geçmiş/Ayarlar/Diğer); URL’ler İngilizce kalır.
+
 ### Dashboard
-- Live sensor cards (DHT22, DS18B20, BH1750, ADS1115 raw channels).
-- Summary row: safe mode, last data timestamp + age, alerts count, automation state.
-- Automation status card with window, target minutes, override, block, min-off, last off reason.
-- Automation badge legend (active, override, lux error, max lux, off).
-- Charts: metric selector + 24h/7d range + CSV download.
-- Chart footer: min/max/last/count/last update.
-- Actuator state list (state, last change, reason).
-- Alerts list (latest 5).
-- Energy estimate (24h/7d totals + per-channel breakdown; note for timed-only channels).
-- Sensor health list (last OK, offline duration, offline limit note).
-- Event log (automation + manual events).
+- Canlı sensör kartları (DHT22, DS18B20, BH1750, ADS1115 ham kanalları).
+- Özet satırı: SAFE MODE, son veri zamanı + yaşı, uyarı sayısı, otomasyon durumu.
+- Otomasyon durum kartı: pencere, hedef dakika, override, blok, min-off, son kapanma sebebi.
+- Otomasyon rozetleri: aktif, override, lux hata, max lux, kapalı.
+- Grafikler: metrik seçimi + 24s/7g aralık + CSV indir.
+- Grafik altı: min/max/son/sayı/güncelleme.
+- Aktüatör durum listesi (durum, son değişim, sebep).
+- Uyarı listesi (son 5).
+- Enerji tahmini (24s/7g toplamları + kanal kırılımı; süreli kanallar notu).
+- Sensör sağlık listesi (son OK, offline süresi, offline limit notu).
+- Olay günlüğü (otomasyon + manuel).
 
-### Control
-- Manual relay control with SAFE MODE gating.
-- Emergency stop (all off).
-- Pump/heater confirmation flow with countdown modal.
-- Per-channel cooldown notes (pump, heater).
-- Recent command list with reasons.
+### Kontrol
+- SAFE MODE kilidiyle manuel röle kontrolü.
+- Acil durdurma (hepsi OFF).
+- Pompa/ısıtıcı onay akışı (geri sayım modal).
+- Kanal bazlı cooldown notları (pompa, ısıtıcı).
+- Son komut listesi + sebepler.
 
-### Settings
-- Admin token input + status (stored in browser).
-- SAFE MODE toggle.
-- Limits: pump max + cooldown, heater max + cutoff.
-- Save button with saved status.
-- Automation sections:
-  - Lux (target minutes, lux OK/max, window, min on/off, manual override).
-  - Heater (sensor choice, temp band, max/min, night mode, fan required).
-  - Pump (soil channel, dry threshold, pulse, max daily, window, override).
-  - Fan (RH high/low, max/min, night mode, periodic mode).
-  - Soil calibration table with dry/wet quick capture buttons.
-- Alert thresholds (offline, temp/hum high/low).
-- Energy price settings (kWh tiers).
+### Ayarlar
+- Admin token girişi + durum (tarayıcıda saklanır).
+- SAFE MODE anahtarı.
+- Limitler: pompa max + cooldown, ısıtıcı max + cutoff.
+- Kaydet düğmesi + kayıt durumu.
+- Otomasyon bölümleri:
+  - Lux (hedef dakika, lux OK/max, pencere, min on/off, manuel override).
+  - Isıtıcı (sensör seçimi, sıcaklık bandı, max/min, gece modu, fan şartı).
+  - Pompa (toprak kanalı, kuru eşik, pulse, günlük max, pencere, override).
+  - Fan (RH high/low, max/min, gece modu, periyodik mod).
+  - Toprak kalibrasyon tablosu (kuru/ıslak hızlı yakalama).
+- Uyarı eşikleri (offline, sıcaklık/nem high/low).
+- Enerji fiyat ayarları (kWh katmanları).
 
-### Hardware
-- Channel mapping table:
-  - name, active, role, GPIO pin, active low.
-  - description, power, quantity, total power, voltage, notes.
-- Sensor settings:
-  - DHT22 GPIO, BH1750 addr, ADS1115 addr, DS18B20 enable.
-- Save action sets all channels OFF for safety.
+### Donanım
+- Kanal eşleme tablosu:
+  - ad, aktif, rol, GPIO pin, active low.
+  - açıklama, güç, adet, toplam güç, voltaj, notlar.
+- Sensör ayarları:
+  - DHT22 GPIO, BH1750 adresi, ADS1115 adresi, DS18B20 etkin.
+- Kaydet aksiyonu tüm kanalları güvenlik için OFF yapar.
 
-### Logs
-- Sensor log table with filter fields (from/to, limit, interval, order).
-- Interval options: raw, 1, 5, 15, 30, 60 minutes.
-- CSV export for the selected range.
-- Log clear (SQLite only; CSV files remain).
+### Geçmiş / Kayıtlar
+- Sensör kayıt tablosu (from/to, limit, interval, order filtreleri).
+- Aralık seçenekleri: raw, 1, 5, 15, 30, 60 dakika.
+- Seçili aralık için CSV dışa aktarım.
+- Kayıt temizle (sadece SQLite; CSV dosyaları kalır).
 
-### Reports
-- Daily report: story summary, comparisons, progress bars, teaching cards.
-- Weekly report: summary cards + weekly chart + daily breakdown table.
-- Beginner mode toggle hides expert-only details.
-- Weather warning banner when external data is missing (if applicable).
+### Raporlar
+- Günlük rapor: özet hikaye, karşılaştırmalar, ilerleme barları, açıklayıcı kartlar.
+- Haftalık rapor: özet kartlar + haftalık grafik + günlük kırılım tablosu.
+- Acemi modu ayrıntılı alanları gizler.
+- Dış veri yoksa hava durumu uyarı bandı görünür (varsa).
 
 ### LCD
-- I2C LCD settings (enable, mode, address, port, expander, charmap, size).
-- Line editor (4x20) with counters.
-- Clear lines and template preset buttons.
-- Token buttons insert into selected line.
-- Preview of resolved output.
-- LCD mode: auto / template / manual.
+- I2C LCD ayarları (enable, mode, address, port, expander, charmap, size).
+- Satır editörü (4x20) + sayaçlar.
+- Satır temizle ve şablon hazır butonları.
+- Token butonları seçili satıra ekler.
+- Çözülmüş çıktı önizlemesi.
+- LCD modu: auto / template / manual.
 
-### Updates
-- Changelog list read from `config/updates.json` via `/api/updates`.
-- Last update date shown at top.
-- Empty state message when no updates exist.
+### Güncellemeler
+- Değişiklik listesi `/api/updates` ile `config/updates.json` içinden okunur.
+- Üstte son güncelleme tarihi gösterilir.
+- Kayıt yoksa boş durum mesajı görünür.
 
-### Notes
-- Static improvement suggestions grouped by topic.
-- Data is rendered server-side and not user-editable.
+### Notlar
+- Konu bazlı statik iyileştirme önerileri.
+- Veriler sunucuda render edilir; kullanıcı düzenleyemez.
 
-### Help / FAQ
-- FAQ sections for dashboard, control, settings, logs, troubleshooting.
-- Explains OK/SIM/HATA/YOK status badges and stale data behavior.
+### Yardım / SSS
+- Dashboard, kontrol, ayarlar, kayıtlar, sorun giderme başlıkları.
+- OK/SIM/HATA/YOK rozetlerini ve stale davranışını açıklar.
 
 ## Sensors (Current)
 - DHT22: temp + humidity (GPIO).
@@ -162,3 +172,11 @@ Planned in `Serav1/future-features.md` and `Serav1/panel-redesign-spec.md`.
 - Sensor log schema is fixed to current sensors.
 - No zone/kat abstraction in UI or config.
 - LCD template tokens are limited to global sensors only.
+- `sensor_log` tek tablo; Serav1’de key/value telemetri tablosu eklenmeli ve `sensor_log` kademeli olarak read-only’ye alınmalı (hedef: yeni veri sadece telemetri tablosuna, raporlar her iki kaynaktan okuyacak geçiş dönemi).
+- UI/JS ve `app.py` tek cihaz sabitlerine (LIGHT_CHANNEL_NAME, PUMP, tek heater) bağlı; refaktörden önce bu bağımlılıkların envanteri çıkarılmalı ve zone-first soyutlama ile yer değiştirme planlanmalı.
+
+## Serav1 Geçiş Notları
+- API’ler tek cihaz varsayımıyla tasarlandığı için `/api/status` ve `/api/config` yanıtları zone-first şemaya yumuşak geçiş için paralel alanlar gerektirir (eski alanları `deprecated` işaretleyip kalkış tarihi eklemek gerekiyor).
+- `sensor_log` sabit kolonlu; Serav1’de metric/key-value şemasına geçerken mevcut tabloyu okuyan raporlar korunmalı, yazma yeni telemetri tablosuna alınmalı.
+- Konfig (channels/sensors) tek sera için; zone katalog formatına göçerken mevcut roller `zone: "sera"` altında tutulmalı ve UI’de pin değişiklikleri “tüm kanallar OFF + SAFE MODE” davranışını korumalı.
+- SAFE MODE, emergency stop ve süre limitleri bugün tek backend için var; Serav1’de ESP32 backend geldiğinde bu sinyallerin node komut/ACK yoluyla zorunlu uygulanması gerekiyor.

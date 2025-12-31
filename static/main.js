@@ -15,11 +15,24 @@ const state = {
     data: null,
     render: null,
     hoverBound: false,
+    mode: 'legacy',
+    zone: '',
+    zonesKey: '',
   },
   historyTimer: null,
   eventsTimer: null,
   eventsLastFetch: 0,
+  eventsData: null,
+  eventsFilter: { category: '', level: '', rangeHours: 0 },
   settingsSavedTimer: null,
+  overview: {
+    nodeFilter: 'all',
+    summaryRange: 24,
+    summaryCache: {},
+    summaryZone: '',
+    summaryZoneKey: '',
+  },
+  zoneTrends: {},
 };
 
 const HISTORY_METRICS = {
@@ -31,11 +44,26 @@ const HISTORY_METRICS = {
   soil_ch1: { label: 'Toprak CH1', unit: 'raw' },
   soil_ch2: { label: 'Toprak CH2', unit: 'raw' },
   soil_ch3: { label: 'Toprak CH3', unit: 'raw' },
+  temp_c: { label: 'Sıcaklık', unit: '°C' },
+  rh_pct: { label: 'Nem', unit: '%' },
+  soil_raw: { label: 'Toprak', unit: 'raw' },
 };
 
 const HISTORY_RANGES = {
   '24h': { seconds: 24 * 3600, label: 'Son 24 saat' },
   '7d': { seconds: 7 * 24 * 3600, label: 'Son 7 gün' },
+};
+
+const HISTORY_MAX_POINTS = 800;
+const OVERVIEW_SUMMARY_HOURS = 24;
+const OVERVIEW_SUMMARY_REFRESH_SECONDS = 300;
+const ZONE_TREND_HOURS = 6;
+const ZONE_TREND_REFRESH_SECONDS = 120;
+const ZONE_TREND_MAX_POINTS = 120;
+const OVERVIEW_SUMMARY_RANGES = {
+  6: { label: 'Son 6 saat', short: '6s' },
+  24: { label: 'Son 24 saat', short: '24s' },
+  168: { label: 'Son 7 gün', short: '7g' },
 };
 
 function adminHeaders() {
@@ -90,7 +118,7 @@ function formatAge(seconds) {
   if (seconds === null || seconds === undefined) return 'Veri yok';
   const value = Number(seconds);
   if (Number.isNaN(value)) return 'Veri yok';
-  return `Veri gecikmesi: ${value.toFixed(1)} sn`;
+  return `Veri yaşı: ${value.toFixed(1)} sn`;
 }
 
 function formatDuration(seconds) {
@@ -188,10 +216,13 @@ function renderStatus(status) {
     ageEl.classList.add(status.data_stale ? 'text-danger' : 'text-secondary');
   }
   try { if (window.renderDashboard) window.renderDashboard(status); } catch (_) {}
+  try { if (window.renderOverview) window.renderOverview(status); } catch (_) {}
+  try { if (window.renderZones) window.renderZones(status); } catch (_) {}
   try { if (window.renderControl) window.renderControl(status); } catch (_) {}
   try { if (window.renderSettings) window.renderSettings(status); } catch (_) {}
   try { if (window.renderPins) window.renderPins(status); } catch (_) {}
   try { if (window.renderLcd) window.renderLcd(status); } catch (_) {}
+  try { if (typeof syncHistoryZones === 'function') syncHistoryZones(); } catch (_) {}
 }
 
 function poll() {
@@ -305,7 +336,7 @@ window.renderDashboard = function(data) {
     } else if (luxTooHigh) {
       autoBadge.textContent = 'Otomasyon Pasif (Lux Max)';
     } else if (manualActive) {
-      autoBadge.textContent = `Otomasyon Manuel Override (${manualRemaining} dk)`;
+      autoBadge.textContent = `Otomasyon Manuel Müdahale (${manualRemaining} dk)`;
     } else if (minOffActive) {
       autoBadge.textContent = `Otomasyon Min Kapalı (${minOffRemaining} dk)`;
     } else if (blockActive) {
@@ -371,7 +402,7 @@ window.renderDashboard = function(data) {
       if (automationState.lux_paused) {
         summary = 'Lux hatası nedeniyle pasif.';
       } else if (manualActive) {
-        summary = `Manuel override aktif (${manualRemaining} dk).`;
+        summary = `Manuel müdahale aktif (${manualRemaining} dk).`;
       } else if (minOffActive) {
         summary = `Min kapalı süresi aktif (${minOffRemaining} dk).`;
       } else if (blockActive) {
@@ -446,7 +477,7 @@ window.renderDashboard = function(data) {
       items.push({ level: 'info', text: `Lux otomasyonu pasif: LUX_MAX (${luxMax}) üstü.` });
     }
     if (manualActive) {
-      items.push({ level: 'warning', text: `Otomasyon manuel override aktif (${manualRemaining} dk).` });
+      items.push({ level: 'warning', text: `Otomasyon manuel müdahale aktif (${manualRemaining} dk).` });
     }
     if (blockActive) {
       items.push({ level: 'warning', text: `Otomasyon bloklu (pencere sonuna ${blockRemaining} dk).` });
@@ -576,6 +607,148 @@ function sendActuator(name, state, seconds) {
   });
 }
 
+function sendActuatorPwm(name, dutyPct) {
+  const payload = { duty_pct: dutyPct };
+  return fetch(`/api/actuator/${name}`, {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify(payload),
+  }).then(async r => {
+    if (!r.ok) {
+      const body = await r.json();
+      throw new Error(body.error || 'Hata');
+    }
+    return r.json();
+  });
+}
+
+function confirmCriticalAction(label) {
+  const ok = window.prompt(`${label} için onay gerekli. Onay için YES yaz:`);
+  return ok === 'YES';
+}
+
+function confirmOverrideClear(label) {
+  const ok = window.prompt(`${label} müdahalesi kaldırılacak. Onay için YES yaz:`);
+  return ok === 'YES';
+}
+
+function clearAutomationOverride(scope) {
+  return fetch('/api/automation/override', {
+    method: 'POST',
+    headers: adminHeaders(),
+    body: JSON.stringify({ scope, action: 'clear' }),
+  }).then(async r => {
+    if (!r.ok) {
+      const body = await r.json();
+      throw new Error(body.error || 'Hata');
+    }
+    return r.json();
+  });
+}
+
+function actuatorRoleLabel(role) {
+  const cleaned = String(role || '').toLowerCase().replace(/_/g, ' ');
+  if (!cleaned) return '';
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+function nodeStatusLabel(status) {
+  const normalized = String(status || '').toLowerCase();
+  if (!normalized || normalized === 'unknown') return 'Bilinmiyor';
+  if (normalized === 'ok') return 'OK';
+  if (normalized === 'missing') return 'Eksik';
+  if (normalized === 'error') return 'Hata';
+  return String(status);
+}
+
+function actuatorMetaLine(actuator, nodeHealthMap) {
+  const backend = String(actuator?.backend || '').toLowerCase();
+  if (backend === 'esp32') {
+    const nodeId = actuator?.node_id ? String(actuator.node_id) : '';
+    let nodeText = nodeId ? `Node ${nodeId}` : 'Node bilinmiyor';
+    if (nodeId && nodeHealthMap) {
+      const nodeEntry = nodeHealthMap.get(nodeId);
+      if (nodeEntry && nodeEntry.health) {
+        const status = nodeEntry.health.status || 'unknown';
+        const age = nodeEntry.health.data_age_sec;
+        const ageText = Number.isFinite(Number(age)) ? `${Number(age).toFixed(1)} sn` : '--';
+        nodeText += ` · ${nodeStatusLabel(status)} · ${ageText}`;
+      }
+    }
+    return `ESP32 · ${nodeText}`;
+  }
+  if (backend === 'homeassistant') {
+    return `HA · ${actuator?.ha_entity_id || 'entity yok'}`;
+  }
+  if (actuator?.gpio_pin != null) {
+    return `GPIO ${actuator.gpio_pin} · ${actuator.active_low ? 'active-low' : 'active-high'}`;
+  }
+  return backend ? backend.toUpperCase() : 'GPIO ?';
+}
+
+function automationStatusLine(roleKey, automationState) {
+  if (!automationState) return '';
+  const key = String(roleKey || '').toLowerCase();
+  if (!key) return '';
+  const joiner = [];
+  if (key.startsWith('fan')) {
+    const fan = automationState.fan || {};
+    joiner.push(`Otomasyon: ${fan.enabled ? 'Açık' : 'Kapalı'}`);
+    const override = minutesRemaining(fan.manual_override_until_ts);
+    if (override > 0) joiner.push(`Müdahale: ${override} dk`);
+    return joiner.join(' · ');
+  }
+  if (key === 'heater') {
+    const heater = automationState.heater || {};
+    joiner.push(`Otomasyon: ${heater.enabled ? 'Açık' : 'Kapalı'}`);
+    const override = minutesRemaining(heater.manual_override_until_ts);
+    if (override > 0) joiner.push(`Müdahale: ${override} dk`);
+    return joiner.join(' · ');
+  }
+  if (key === 'pump') {
+    const pump = automationState.pump || {};
+    joiner.push(`Otomasyon: ${pump.enabled ? 'Açık' : 'Kapalı'}`);
+    const override = minutesRemaining(pump.manual_override_until_ts);
+    if (override > 0) joiner.push(`Müdahale: ${override} dk`);
+    const block = minutesRemaining(pump.block_until_ts);
+    if (block > 0) joiner.push(`Blok: ${block} dk`);
+    return joiner.join(' · ');
+  }
+  if (key === 'light') {
+    joiner.push(`Lux otomasyonu: ${automationState.enabled ? 'Açık' : 'Kapalı'}`);
+    const override = minutesRemaining(automationState.manual_override_until_ts);
+    if (override > 0) joiner.push(`Müdahale: ${override} dk`);
+    return joiner.join(' · ');
+  }
+  return '';
+}
+
+function automationOverrideInfo(roleKey, automationState) {
+  if (!automationState) return { active: false, scope: null, remaining: 0 };
+  const key = String(roleKey || '').toLowerCase();
+  if (!key) return { active: false, scope: null, remaining: 0 };
+  if (key.startsWith('fan')) {
+    const fan = automationState.fan || {};
+    const remaining = minutesRemaining(fan.manual_override_until_ts);
+    return { active: remaining > 0, scope: 'fan', remaining };
+  }
+  if (key === 'heater') {
+    const heater = automationState.heater || {};
+    const remaining = minutesRemaining(heater.manual_override_until_ts);
+    return { active: remaining > 0, scope: 'heater', remaining };
+  }
+  if (key === 'pump') {
+    const pump = automationState.pump || {};
+    const remaining = minutesRemaining(pump.manual_override_until_ts);
+    return { active: remaining > 0, scope: 'pump', remaining };
+  }
+  if (key === 'light') {
+    const remaining = minutesRemaining(automationState.manual_override_until_ts);
+    return { active: remaining > 0, scope: 'lux', remaining };
+  }
+  return { active: false, scope: null, remaining: 0 };
+}
+
 window.initControl = function() {
   poll();
   state.poller = setInterval(poll, 2500);
@@ -597,12 +770,36 @@ window.renderControl = function(data) {
   if (!wrap) return;
   const banner = document.getElementById('controlBanner');
   const sensorFaults = data.sensor_faults || {};
+  const automationState = data.automation_state || {};
+  const nodeHealthMap = new Map();
+  (data.nodes || []).forEach(node => {
+    if (node && node.node_id) nodeHealthMap.set(node.node_id, node);
+  });
   if (banner) {
     const items = [];
     if (data.safe_mode) {
       items.push({ level: 'warning', text: 'SAFE MODE açık: manuel kontrol kilitli.' });
     } else {
       items.push({ level: 'info', text: 'SAFE MODE kapalı: manuel kontrol açık.' });
+    }
+    const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+    const nodeIssues = nodes.filter(node => {
+      const status = node?.health?.status || 'unknown';
+      return status !== 'ok';
+    });
+    if (nodeIssues.length) {
+      const labels = nodeIssues.slice(0, 3).map(node => {
+        const id = node?.node_id || node?.id || 'node';
+        const status = node?.health?.status || 'unknown';
+        return `${id} (${nodeStatusLabel(status)})`;
+      });
+      const extra = nodeIssues.length - labels.length;
+      const suffix = extra > 0 ? ` +${extra}` : '';
+      const anyMissing = nodeIssues.some(node => (node?.health?.status || 'unknown') === 'missing');
+      items.push({
+        level: anyMissing ? 'danger' : 'warning',
+        text: `Node uyarı: ${labels.join(', ')}${suffix}`,
+      });
     }
     if (sensorFaults.pump) {
       items.push({ level: 'danger', text: 'Pompa kilitli: toprak nem sensörü hatası.' });
@@ -615,88 +812,271 @@ window.renderControl = function(data) {
       .join('');
   }
   wrap.innerHTML = '';
-  const actuators = Object.entries(data.actuator_state || {});
-  if (!actuators.length) {
-    wrap.innerHTML = '<div class="text-secondary small">Röleler yüklenemedi. Lütfen /api/status kontrol et.</div>';
-    return;
-  }
   const cooldowns = data.cooldowns || {};
   const pumpMax = Number(data.limits?.pump_max_seconds || 0);
-  actuators.forEach(([name, info]) => {
-    const col = document.createElement('div');
-    col.className = 'col-md-4';
-    const isPump = name.includes('PUMP');
-    const isHeater = name.includes('HEATER');
+  const actuators = Array.isArray(data.actuators) ? data.actuators : [];
+  if (!actuators.length) {
+    wrap.innerHTML = '<div class="text-secondary small">Aktüatör verisi yok. Lütfen /api/status kontrol et.</div>';
+    return;
+  }
+
+  const actuatorsById = new Map();
+  actuators.forEach(act => {
+    if (act && act.id) actuatorsById.set(act.id, act);
+  });
+
+  const sensors = Array.isArray(data.sensors) ? data.sensors : [];
+  const sensorsById = new Map();
+  sensors.forEach(sensor => {
+    if (sensor && sensor.id) sensorsById.set(sensor.id, sensor);
+  });
+
+  const resolveZoneSensors = (zone) => {
+    const zoneSensors = Array.isArray(zone.sensors)
+      ? zone.sensors.map(id => sensorsById.get(id)).filter(Boolean)
+      : [];
+    if (!zoneSensors.length && zone && zone.id) {
+      sensors.forEach(sensor => {
+        if (sensor && sensor.zone === zone.id) zoneSensors.push(sensor);
+      });
+    }
+    return zoneSensors;
+  };
+
+  const zones = Array.isArray(data.zones) ? data.zones : [];
+  const roleOrder = {
+    heater: 1,
+    fan: 2,
+    fan_canopy: 2,
+    fan_box: 2,
+    fan_exhaust: 2,
+    light: 3,
+    pump: 4,
+  };
+
+  const renderActuatorCard = (actuator) => {
+    const name = String(actuator.id || '').trim();
+    const nameUpper = name.toUpperCase();
+    const desc = actuator.label || actuator.description || name;
+    const role = String(actuator.role || '').toLowerCase();
+    const backend = String(actuator.backend || '').toLowerCase();
+    const isPump = role === 'pump' || nameUpper.includes('PUMP');
+    const isHeater = role === 'heater' || nameUpper.includes('HEATER');
+    const isFan = role.startsWith('fan') || nameUpper.includes('FAN');
+    const isLight = role === 'light' || nameUpper.includes('LIGHT');
+    const supportsPwm = !!actuator.supports_pwm && backend === 'esp32';
+    const supportsDuration = backend !== 'esp32';
     const heaterLocked = isHeater && !!sensorFaults.heater;
     const pumpLocked = isPump && !!sensorFaults.pump;
     const heaterMax = data.limits?.heater_max_seconds;
     const heaterNote = isHeater && heaterMax ? `Isıtıcı max: ${heaterMax} sn` : '';
     const heaterLockNote = heaterLocked ? 'Isıtıcı kilitli: sensör hatası.' : '';
-    const pumpCooldown = isPump && cooldowns[name] != null ? Number(cooldowns[name]) : 0;
+    const cooldownKey = actuator.legacy_name || actuator.name || actuator.id || name;
+    const pumpCooldown = isPump && cooldowns[cooldownKey] != null ? Number(cooldowns[cooldownKey]) : 0;
     const pumpNote = isPump
       ? (pumpCooldown > 0 ? `Pompa cooldown: ${Math.ceil(pumpCooldown)} sn` : 'Pompa hazır.')
       : '';
+    const lastChange = actuator.last_change_ts ? formatUnixSeconds(actuator.last_change_ts) : '--';
+    const reason = actuator.reason ? ` · ${actuator.reason}` : '';
+    const roleLabel = actuatorRoleLabel(role);
+    const pwmValue = actuator.duty_pct != null ? Number(actuator.duty_pct) : (actuator.state ? 100 : 0);
+    const roleKey = role || (isPump ? 'pump' : isHeater ? 'heater' : isFan ? 'fan' : isLight ? 'light' : '');
+    const automationLine = automationStatusLine(roleKey, automationState);
+    const overrideInfo = automationOverrideInfo(roleKey, automationState);
+
+    const col = document.createElement('div');
+    col.className = 'col-md-4';
+    col.dataset.actuatorRole = role || '';
     col.innerHTML = `
       <div class="card h-100">
         <div class="card-body d-flex flex-column gap-2">
           <div>
             <div class="d-flex justify-content-between align-items-center">
-              <h6 class="mb-0">${info.description || name}</h6>
-              <span class="pill small" style="border-color:${info.state ? '#22c55e' : '#64748b'}">${name}</span>
+              <h6 class="mb-0">${desc}</h6>
+              <span class="pill small" style="border-color:${actuator.state ? '#22c55e' : '#64748b'}">${name || '--'}</span>
             </div>
-            <div class="text-secondary small">GPIO ${info.gpio_pin} · ${info.active_low ? 'active-low' : 'active-high'}</div>
+            <div class="text-secondary small">${actuatorMetaLine(actuator, nodeHealthMap)}</div>
+            ${roleLabel ? `<div class="small text-secondary">Rol: ${roleLabel}</div>` : ''}
+            <div class="small text-secondary">Son değişiklik: ${lastChange}${reason}</div>
+            ${automationLine ? `<div class="small text-secondary">${automationLine}</div>` : ''}
+            ${overrideInfo.active ? '<button class="btn btn-outline-warning btn-sm mt-1" data-action="clear-override" data-scope="' + overrideInfo.scope + '">Müdahaleyi Kaldır</button>' : ''}
             ${heaterNote ? `<div class="small text-secondary">${heaterNote}</div>` : ''}
             ${heaterLockNote ? `<div class="small text-danger">${heaterLockNote}</div>` : ''}
             ${pumpNote ? `<div class="small text-secondary">${pumpNote}</div>` : ''}
             ${pumpLocked ? '<div class="small text-danger">Pompa kilitli: sensör hatası.</div>' : ''}
+            ${!supportsDuration ? '<div class="small text-secondary">ESP32 cihazlarda süreli komut yok.</div>' : ''}
           </div>
           <div class="d-flex gap-2 align-items-center flex-wrap mt-auto">
-            <input class="form-control form-control-sm w-25" data-field="sec" type="number" min="1" placeholder="sn">
+            ${supportsDuration ? '<input class="form-control form-control-sm w-25" data-field="sec" type="number" min="1" placeholder="sn">' : ''}
             <button class="btn btn-success flex-fill" data-action="on">Aç</button>
-            <button class="btn btn-outline-info flex-fill" data-action="pulse">Süreli</button>
+            ${supportsDuration ? '<button class="btn btn-outline-info flex-fill" data-action="pulse">Süreli</button>' : ''}
             <button class="btn btn-outline-secondary flex-fill" data-action="off">Kapat</button>
           </div>
+          ${supportsPwm ? `
+            <div class="d-flex align-items-center gap-2 mt-1">
+              <input class="form-range" data-field="pwm" type="range" min="0" max="100" step="5" value="${pwmValue}">
+              <span class="small text-secondary" data-field="pwmValue">${Math.round(pwmValue)}%</span>
+              <button class="btn btn-outline-primary btn-sm" data-action="pwm">PWM</button>
+            </div>
+          ` : ''}
         </div>
       </div>`;
-    col.querySelectorAll('button').forEach(btn => {
+
+    const pwmSlider = col.querySelector('[data-field="pwm"]');
+    const pwmValueLabel = col.querySelector('[data-field="pwmValue"]');
+    if (pwmSlider && pwmValueLabel) {
+      pwmSlider.addEventListener('input', () => {
+        pwmValueLabel.textContent = `${Math.round(Number(pwmSlider.value))}%`;
+      });
+    }
+
+    col.querySelectorAll('button[data-action]').forEach(btn => {
       btn.onclick = () => {
-        const action = btn.dataset.action === 'on';
-        const input = col.querySelector('[data-field="sec"]');
-        const secRaw = input ? parseInt(input.value || '0', 10) : 0;
-        const seconds = Number.isFinite(secRaw) && secRaw > 0 ? secRaw : null;
-        if (btn.dataset.action === 'pulse') {
+        const action = btn.dataset.action;
+        if (action === 'clear-override') {
+          const scope = btn.dataset.scope || '';
+          const label = desc || name || 'Aktüatör';
+          if (!confirmOverrideClear(label)) return;
+          clearAutomationOverride(scope).then(poll).catch(e => alert(e.message));
+          return;
+        }
+        const needsConfirm = (isPump || isHeater) && (action === 'on' || action === 'pulse');
+        if (needsConfirm && !confirmCriticalAction(desc || name || 'Aktüatör')) return;
+
+        if (action === 'pwm') {
+          if (!supportsPwm) return;
+          const duty = pwmSlider ? Number(pwmSlider.value) : 0;
+          sendActuatorPwm(name, duty).then(poll).catch(e => alert(e.message));
+          return;
+        }
+        if (action === 'pulse') {
+          const input = col.querySelector('[data-field="sec"]');
+          const secRaw = input ? parseInt(input.value || '0', 10) : 0;
+          const seconds = Number.isFinite(secRaw) && secRaw > 0 ? secRaw : null;
           if (!seconds) return alert('Süreli için saniye gir.');
           sendActuator(name, true, seconds).then(poll).catch(e => alert(e.message));
           return;
         }
-        if (btn.dataset.action === 'on') {
-          if (isPump) {
+        if (action === 'on') {
+          const input = col.querySelector('[data-field="sec"]');
+          const secRaw = input ? parseInt(input.value || '0', 10) : 0;
+          const seconds = Number.isFinite(secRaw) && secRaw > 0 ? secRaw : null;
+          if (isPump && supportsDuration) {
             const finalSec = seconds || pumpMax || 5;
             sendActuator(name, true, finalSec).then(poll).catch(e => alert(e.message));
             return;
           }
-          sendActuator(name, true, seconds || undefined).then(poll).catch(e => alert(e.message));
+          if (supportsDuration) {
+            sendActuator(name, true, seconds || undefined).then(poll).catch(e => alert(e.message));
+            return;
+          }
+          sendActuator(name, true).then(poll).catch(e => alert(e.message));
           return;
         }
         sendActuator(name, false).then(poll).catch(e => alert(e.message));
       };
     });
-    wrap.appendChild(col);
+
+    if (pumpLocked || heaterLocked) {
+      col.querySelectorAll('[data-action="on"], [data-action="pulse"]').forEach(btn => {
+        btn.disabled = true;
+      });
+    }
+    return col;
+  };
+
+  const zoneList = zones.length ? zones : [{ id: 'general', label: 'Genel', actuators: [] }];
+  let renderedAny = false;
+  zoneList.forEach(zone => {
+    let zoneActuators = [];
+    if (Array.isArray(zone.actuators) && zone.actuators.length) {
+      zoneActuators = zone.actuators.map(id => actuatorsById.get(id)).filter(Boolean);
+    } else {
+      zoneActuators = actuators.filter(act => act && act.zone === zone.id);
+    }
+    if (!zoneActuators.length) return;
+    renderedAny = true;
+    const zoneSensors = resolveZoneSensors(zone);
+    const zoneStatus = zoneStatusBadge(zoneSensors);
+    const tempHumSensor = findZoneSensor(
+      zoneSensors,
+      s => s.purpose === 'temp_hum' || ['dht11', 'dht22', 'sht31'].includes(String(s.kind || '').toLowerCase())
+    );
+    const tempSensor = tempHumSensor || findZoneSensor(zoneSensors, s => s.purpose === 'temp' || s.kind === 'ds18b20');
+    const luxSensor = findZoneSensor(
+      zoneSensors,
+      s => s.purpose === 'lux' || ['bh1750', 'ldr'].includes(String(s.kind || '').toLowerCase())
+    );
+    const soilSensor = findZoneSensor(zoneSensors, s => s.purpose === 'soil' || s.kind === 'ads1115');
+    const tempValue = tempSensor?.last_value?.temperature;
+    const humValue = tempHumSensor?.last_value?.humidity;
+    const luxValue = luxSensor?.last_value?.lux;
+    const soilValue = soilSensor?.last_value?.raw;
+    const summaryParts = [];
+    const addMetric = (label, value, unit, digits) => {
+      if (value === null || value === undefined || Number.isNaN(Number(value))) return;
+      summaryParts.push(`${label}: ${formatValue(value, unit, digits)}`);
+    };
+    addMetric('Sıcaklık', tempValue, '°C', 1);
+    addMetric('Nem', humValue, '%', 1);
+    addMetric('Lux', luxValue, 'lx', 0);
+    addMetric('Toprak', soilValue, 'raw', 0);
+    const metricsText = summaryParts.length ? summaryParts.join(' · ') : 'Sensör verisi yok';
+    zoneActuators.sort((a, b) => {
+      const roleA = String(a.role || '').toLowerCase();
+      const roleB = String(b.role || '').toLowerCase();
+      const orderA = roleOrder[roleA] || 99;
+      const orderB = roleOrder[roleB] || 99;
+      if (orderA !== orderB) return orderA - orderB;
+      return String(a.label || a.id || '').localeCompare(String(b.label || b.id || ''));
+    });
+    const header = document.createElement('div');
+    header.className = 'col-12';
+    header.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mt-2">
+        <div class="d-flex align-items-center gap-2">
+          <h6 class="mb-0">${zone.label || zone.id || 'Zon'}</h6>
+          <span class="badge ${zoneStatus.cls}">${zoneStatus.text}</span>
+        </div>
+        <span class="small text-secondary">${zoneActuators.length} aktüatör</span>
+      </div>
+      <div class="small text-secondary">${metricsText}</div>
+    `;
+    wrap.appendChild(header);
+    zoneActuators.forEach(actuator => {
+      if (!actuator || !actuator.id) return;
+      wrap.appendChild(renderActuatorCard(actuator));
+    });
   });
+
+  if (!renderedAny) {
+    const header = document.createElement('div');
+    header.className = 'col-12';
+    header.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mt-2">
+        <h6 class="mb-0">Aktüatörler</h6>
+        <span class="small text-secondary">${actuators.length} aktüatör</span>
+      </div>
+    `;
+    wrap.appendChild(header);
+    const sorted = [...actuators].sort((a, b) => {
+      const roleA = String(a.role || '').toLowerCase();
+      const roleB = String(b.role || '').toLowerCase();
+      const orderA = roleOrder[roleA] || 99;
+      const orderB = roleOrder[roleB] || 99;
+      if (orderA !== orderB) return orderA - orderB;
+      return String(a.label || a.id || '').localeCompare(String(b.label || b.id || ''));
+    });
+    sorted.forEach(actuator => {
+      if (!actuator || !actuator.id) return;
+      wrap.appendChild(renderActuatorCard(actuator));
+    });
+  }
+
   const lockControls = !!data.safe_mode;
   wrap.querySelectorAll('button, input').forEach(btn => {
     btn.disabled = lockControls;
   });
-  if (sensorFaults.pump) {
-    wrap.querySelectorAll('[data-action="on"], [data-action="pulse"]').forEach(btn => {
-      const card = btn.closest('.card');
-      if (!card) return;
-      const pill = card.querySelector('.pill');
-      if (!pill) return;
-      if (!String(pill.textContent || '').includes('PUMP')) return;
-      btn.disabled = true;
-    });
-  }
   const emergencyBtn = document.getElementById('emergencyStop');
   if (emergencyBtn) emergencyBtn.disabled = false;
 };
@@ -705,11 +1085,27 @@ function initHistory() {
   const metricSelect = document.getElementById('historyMetric');
   const rangeLabel = document.getElementById('historyRangeLabel');
   if (!metricSelect || !rangeLabel) return;
+  const zoneSelect = document.getElementById('historyZone');
+  state.history.mode = zoneSelect ? 'trend' : 'legacy';
+  const fallbackMetric = state.history.mode === 'trend' ? 'temp_c' : 'dht_temp';
+  if (!HISTORY_METRICS[state.history.metric]) {
+    state.history.metric = fallbackMetric;
+  }
   metricSelect.value = state.history.metric;
   metricSelect.onchange = () => {
     state.history.metric = metricSelect.value;
     fetchHistory(true);
   };
+  if (zoneSelect) {
+    syncHistoryZones();
+    state.history.zone = zoneSelect.value || '';
+    zoneSelect.onchange = () => {
+      state.history.zone = zoneSelect.value || '';
+      fetchHistory(true);
+    };
+  } else {
+    state.history.zone = '';
+  }
   document.querySelectorAll('[data-history-range]').forEach(btn => {
     btn.addEventListener('click', () => {
       setHistoryRange(btn.dataset.historyRange);
@@ -750,7 +1146,7 @@ function bindHistoryHover() {
     const idx = Math.min(points.length - 1, Math.max(0, Math.round(ratio * (points.length - 1))));
     const point = points[idx];
     let value = Number(point[1]);
-    if (metric === 'dht_temp' || metric === 'ds18_temp') {
+    if (metric === 'dht_temp' || metric === 'ds18_temp' || metric === 'temp_c') {
       value = Math.min(maxVal, Math.max(minVal, value));
     }
     const timeLabel = formatUnixMinutes(point[0]);
@@ -779,7 +1175,35 @@ function updateHistoryRangeButtons() {
   document.querySelectorAll('[data-history-range]').forEach(btn => {
     const active = btn.dataset.historyRange === state.history.range;
     btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   });
+}
+
+function syncHistoryZones() {
+  const zoneSelect = document.getElementById('historyZone');
+  if (!zoneSelect) return;
+  const zones = Array.isArray(state.status && state.status.zones) ? state.status.zones : [];
+  const key = zones
+    .map(zone => `${zone?.id || ''}:${zone?.label || ''}`)
+    .join('|');
+  if (state.history.zonesKey === key && zoneSelect.options.length) return;
+  state.history.zonesKey = key;
+  const current = zoneSelect.value;
+  zoneSelect.innerHTML = '';
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = 'Genel (SERA)';
+  zoneSelect.appendChild(defaultOption);
+  zones.forEach(zone => {
+    if (!zone || !zone.id) return;
+    const option = document.createElement('option');
+    option.value = zone.id;
+    option.textContent = zone.label || zone.id;
+    zoneSelect.appendChild(option);
+  });
+  const hasCurrent = Array.from(zoneSelect.options).some(opt => opt.value === current);
+  zoneSelect.value = hasCurrent ? current : '';
+  state.history.zone = zoneSelect.value || '';
 }
 
 function fetchHistory(force) {
@@ -788,32 +1212,74 @@ function fetchHistory(force) {
   const now = Date.now() / 1000;
   if (!force && now - state.history.lastFetch < 25) return;
   const rangeMeta = HISTORY_RANGES[state.history.range] || HISTORY_RANGES['24h'];
-  const from = now - rangeMeta.seconds;
-  fetch(`/api/history?metric=${encodeURIComponent(metric)}&from=${from}&to=${now}`)
-    .then(r => r.json())
-    .then(data => {
-      state.history.lastFetch = now;
-      state.history.data = data;
-      renderHistory(data);
-    })
-    .catch(() => {
-      renderHistory({ metric, points: [] });
+  const mode = state.history.mode || 'legacy';
+  if (mode === 'trend') {
+    syncHistoryZones();
+    const hours = Math.max(1, Math.round(rangeMeta.seconds / 3600));
+    const params = new URLSearchParams({
+      metric,
+      hours: String(hours),
+      max_points: String(HISTORY_MAX_POINTS),
     });
+    if (state.history.zone) params.set('zone', state.history.zone);
+    fetch(`/api/trends?${params.toString()}`)
+      .then(r => r.json())
+      .then(data => {
+        state.history.lastFetch = now;
+        state.history.data = data;
+        renderHistory(data);
+      })
+      .catch(() => {
+        renderHistory({ metric, points: [] });
+      });
+  } else {
+    const from = now - rangeMeta.seconds;
+    fetch(`/api/history?metric=${encodeURIComponent(metric)}&from=${from}&to=${now}`)
+      .then(r => r.json())
+      .then(data => {
+        state.history.lastFetch = now;
+        state.history.data = data;
+        renderHistory(data);
+      })
+      .catch(() => {
+        renderHistory({ metric, points: [] });
+      });
+  }
 }
 
 function renderHistory(data) {
   const metric = data.metric || state.history.metric;
   const rangeMeta = HISTORY_RANGES[state.history.range] || HISTORY_RANGES['24h'];
+  const mode = state.history.mode || 'legacy';
   const rangeLabel = document.getElementById('historyRangeLabel');
   if (rangeLabel) {
     const metricLabel = HISTORY_METRICS[metric]?.label || metric;
-    rangeLabel.textContent = `${metricLabel} · ${rangeMeta.label}`;
+    if (mode === 'trend') {
+      const zoneSelect = document.getElementById('historyZone');
+      const zoneLabel = zoneSelect && zoneSelect.selectedOptions.length
+        ? zoneSelect.selectedOptions[0].textContent
+        : 'Genel (SERA)';
+      rangeLabel.textContent = `${metricLabel} · ${zoneLabel} · ${rangeMeta.label}`;
+    } else {
+      rangeLabel.textContent = `${metricLabel} · ${rangeMeta.label}`;
+    }
   }
   const downloadLink = document.getElementById('historyDownload');
-  if (downloadLink && data.from_ts && data.to_ts) {
-    const fromTs = encodeURIComponent(data.from_ts);
-    const toTs = encodeURIComponent(data.to_ts);
-    downloadLink.href = `/api/history?metric=${encodeURIComponent(metric)}&from=${fromTs}&to=${toTs}&format=csv`;
+  if (downloadLink) {
+    if (mode === 'trend') {
+      const hours = Math.max(1, Math.round(rangeMeta.seconds / 3600));
+      const params = new URLSearchParams({
+        metric,
+        hours: String(hours),
+        format: 'csv',
+      });
+      if (state.history.zone) params.set('zone', state.history.zone);
+      downloadLink.href = `/api/trends?${params.toString()}`;
+    } else if (data.from_ts && data.to_ts) {
+      const fromTs = encodeURIComponent(data.from_ts);
+      const toTs = encodeURIComponent(data.to_ts);
+      downloadLink.href = `/api/history?metric=${encodeURIComponent(metric)}&from=${fromTs}&to=${toTs}&format=csv`;
+    }
   }
   const pointsRaw = Array.isArray(data.points) ? data.points : [];
   const points = pointsRaw.filter(p => p && p.length > 1 && p[1] !== null && !Number.isNaN(Number(p[1])));
@@ -823,6 +1289,9 @@ function renderHistory(data) {
   if (emptyEl) emptyEl.classList.toggle('d-none', points.length > 0);
   const updatedEl = document.getElementById('historyUpdated');
   if (updatedEl) updatedEl.textContent = new Date().toLocaleTimeString();
+  const minBadge = document.getElementById('historyMinBadge');
+  const maxBadge = document.getElementById('historyMaxBadge');
+  const lastBadge = document.getElementById('historyLastBadge');
 
   if (!points.length) {
     const minEl = document.getElementById('historyMin');
@@ -831,6 +1300,9 @@ function renderHistory(data) {
     if (minEl) minEl.textContent = '--';
     if (maxEl) maxEl.textContent = '--';
     if (lastEl) lastEl.textContent = '--';
+    if (minBadge) minBadge.textContent = 'Min --';
+    if (maxBadge) maxBadge.textContent = 'Max --';
+    if (lastBadge) lastBadge.textContent = 'Son --';
     const canvas = document.getElementById('historyChart');
     if (canvas) drawHistoryChart(canvas, [], metric);
     return;
@@ -850,9 +1322,12 @@ function renderHistory(data) {
   if (minEl) minEl.textContent = formatMetricValue(minVal, metric);
   if (maxEl) maxEl.textContent = formatMetricValue(maxVal, metric);
   if (lastEl) lastEl.textContent = formatMetricValue(lastVal, metric);
+  if (minBadge) minBadge.textContent = `Min ${formatMetricValue(minVal, metric)}`;
+  if (maxBadge) maxBadge.textContent = `Max ${formatMetricValue(maxVal, metric)}`;
+  if (lastBadge) lastBadge.textContent = `Son ${formatMetricValue(lastVal, metric)}`;
   const canvas = document.getElementById('historyChart');
   if (canvas) {
-    const sampled = downsamplePoints(points, 800);
+    const sampled = downsamplePoints(points, HISTORY_MAX_POINTS);
     drawHistoryChart(canvas, sampled, metric, minVal, maxVal);
   }
 }
@@ -902,7 +1377,7 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
     return;
   }
 
-  if (metric === 'dht_temp' || metric === 'ds18_temp') {
+  if (metric === 'dht_temp' || metric === 'ds18_temp' || metric === 'temp_c') {
     minVal = 0;
     maxVal = 45;
   }
@@ -935,7 +1410,7 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
 
   if (points.length < 2) {
     let value = Number(points[0][1]);
-    if (metric === 'dht_temp' || metric === 'ds18_temp') {
+    if (metric === 'dht_temp' || metric === 'ds18_temp' || metric === 'temp_c') {
       value = Math.min(maxVal, Math.max(minVal, value));
     }
     const x = pad + plotW;
@@ -961,7 +1436,7 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
   ctx.beginPath();
   points.forEach((point, idx) => {
     let value = Number(point[1]);
-    if (metric === 'dht_temp' || metric === 'ds18_temp') {
+    if (metric === 'dht_temp' || metric === 'ds18_temp' || metric === 'temp_c') {
       value = Math.min(maxVal, Math.max(minVal, value));
     }
     const x = pad + (plotW * (idx / (points.length - 1)));
@@ -981,7 +1456,7 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
   ctx.beginPath();
   points.forEach((point, idx) => {
     let value = Number(point[1]);
-    if (metric === 'dht_temp' || metric === 'ds18_temp') {
+    if (metric === 'dht_temp' || metric === 'ds18_temp' || metric === 'temp_c') {
       value = Math.min(maxVal, Math.max(minVal, value));
     }
     const x = pad + (plotW * (idx / (points.length - 1)));
@@ -996,7 +1471,7 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
   const lastPoint = points[points.length - 1];
   if (lastPoint) {
     let value = Number(lastPoint[1]);
-    if (metric === 'dht_temp' || metric === 'ds18_temp') {
+    if (metric === 'dht_temp' || metric === 'ds18_temp' || metric === 'temp_c') {
       value = Math.min(maxVal, Math.max(minVal, value));
     }
     const x = pad + plotW;
@@ -1025,18 +1500,67 @@ function drawHistoryChart(canvas, points, metric, minVal, maxVal) {
 function initEvents() {
   const wrap = document.getElementById('eventLog');
   if (!wrap) return;
+  bindEventFilters();
   fetchEvents(true);
   if (state.eventsTimer) clearInterval(state.eventsTimer);
   state.eventsTimer = setInterval(() => fetchEvents(false), 8000);
+}
+
+function getEventFilters() {
+  const categoryEl = document.getElementById('eventFilterCategory');
+  const levelEl = document.getElementById('eventFilterLevel');
+  const rangeEl = document.getElementById('eventFilterRange');
+  let rangeHours = 0;
+  if (rangeEl && rangeEl.value) {
+    const parsed = parseFloat(rangeEl.value);
+    rangeHours = Number.isFinite(parsed) ? parsed : 0;
+  }
+  return {
+    category: categoryEl ? (categoryEl.value || '').toLowerCase() : '',
+    level: levelEl ? (levelEl.value || '').toLowerCase() : '',
+    rangeHours,
+  };
+}
+
+function bindEventFilters() {
+  const categoryEl = document.getElementById('eventFilterCategory');
+  const levelEl = document.getElementById('eventFilterLevel');
+  const rangeEl = document.getElementById('eventFilterRange');
+  const refreshEl = document.getElementById('eventFilterRefresh');
+  const apply = () => {
+    const next = getEventFilters();
+    const prevRange = state.eventsFilter?.rangeHours || 0;
+    state.eventsFilter = next;
+    if (next.rangeHours !== prevRange) {
+      fetchEvents(true);
+      return;
+    }
+    if (state.eventsData) renderEvents(state.eventsData);
+  };
+  [categoryEl, levelEl, rangeEl].forEach(el => {
+    if (!el) return;
+    el.addEventListener('change', apply);
+  });
+  if (refreshEl) refreshEl.addEventListener('click', () => fetchEvents(true));
+  state.eventsFilter = getEventFilters();
 }
 
 function fetchEvents(force) {
   const now = Date.now() / 1000;
   if (!force && state.eventsLastFetch && now - state.eventsLastFetch < 7) return;
   state.eventsLastFetch = now;
-  fetch('/api/events?limit=50')
+  const filters = state.eventsFilter || getEventFilters();
+  const params = new URLSearchParams({ limit: '50' });
+  if (filters.rangeHours && Number.isFinite(Number(filters.rangeHours))) {
+    const since = now - (Number(filters.rangeHours) * 3600);
+    if (Number.isFinite(since)) params.set('since', String(since));
+  }
+  fetch(`/api/events?${params.toString()}`)
     .then(r => r.json())
-    .then(data => renderEvents(data))
+    .then(data => {
+      state.eventsData = data;
+      renderEvents(data);
+    })
     .catch(() => renderEvents({ events: [] }));
 }
 
@@ -1057,36 +1581,78 @@ function renderEvents(data) {
     if (!metaName) return true;
     return !disabledNames.has(String(metaName).toUpperCase());
   });
+  const filters = state.eventsFilter || getEventFilters();
+  const filtered = events.filter(event => {
+    if (filters.category && String(event.category || '').toLowerCase() !== filters.category) return false;
+    if (filters.level && String(event.level || '').toLowerCase() !== filters.level) return false;
+    return true;
+  });
   if (!events.length) {
     wrap.textContent = 'Olay yok.';
     return;
   }
+  if (!filtered.length) {
+    wrap.textContent = 'Filtreye uyan kayıt yok.';
+    return;
+  }
   const levelBadge = (level) => {
+    const key = String(level || '').toLowerCase();
     const map = {
       info: 'text-bg-info',
       warning: 'text-bg-warning',
       error: 'text-bg-danger',
     };
-    return map[level] || 'text-bg-secondary';
+    return map[key] || 'text-bg-secondary';
+  };
+  const levelLabel = (level) => {
+    const key = String(level || '').toLowerCase();
+    const map = {
+      info: 'Bilgi',
+      warning: 'Uyarı',
+      error: 'Hata',
+    };
+    return map[key] || (level ? String(level) : '-');
   };
   const categoryBadge = (category) => {
+    const key = String(category || '').toLowerCase();
     const map = {
       actuator: 'text-bg-primary',
+      automation: 'text-bg-info',
       alert: 'text-bg-warning',
+      sensor: 'text-bg-success',
+      node: 'text-bg-secondary',
       system: 'text-bg-secondary',
+      maintenance: 'text-bg-secondary',
+      sensor_log: 'text-bg-secondary',
     };
-    return map[category] || 'text-bg-secondary';
+    return map[key] || 'text-bg-secondary';
   };
-  wrap.innerHTML = events.map(event => {
+  const categoryLabel = (category) => {
+    const key = String(category || '').toLowerCase();
+    const map = {
+      actuator: 'Aktüatör',
+      automation: 'Otomasyon',
+      alert: 'Uyarı',
+      sensor: 'Sensör',
+      node: 'Node',
+      system: 'Sistem',
+      maintenance: 'Bakım',
+      sensor_log: 'Sensör Kaydı',
+    };
+    return map[key] || (category ? String(category) : '-');
+  };
+  wrap.innerHTML = filtered.map(event => {
     const time = event.ts ? formatUnixSeconds(event.ts) : '--';
     const levelCls = levelBadge(event.level);
     const catCls = categoryBadge(event.category);
+    const levelText = levelLabel(event.level);
+    const catText = categoryLabel(event.category);
     const message = event.message || '';
     return `
       <div class="event-item">
         <span class="text-secondary">${time}</span>
-        <span class="badge ${catCls}">${event.category || '-'}</span>
-        <span class="badge ${levelCls}">${event.level || '-'}</span>
+        <span class="badge ${catCls}">${catText}</span>
+        <span class="badge ${levelCls}">${levelText}</span>
         <span>${message}</span>
       </div>`;
   }).join('');
@@ -1381,6 +1947,7 @@ function runRetentionCleanup() {
 window.renderSettings = function(data) {
   if (!document.getElementById('safeModeToggle')) return;
   const limits = data.limits || {};
+  const automationState = data.automation_state || {};
   document.getElementById('safeModeToggle').checked = data.safe_mode;
   document.getElementById('pumpMax').value = limits.pump_max_seconds ?? 15;
   document.getElementById('pumpCooldown').value = limits.pump_cooldown_seconds ?? 60;
@@ -1492,6 +2059,68 @@ window.renderSettings = function(data) {
   const lastCleanup = document.getElementById('retentionLastCleanup');
   if (lastCleanup) {
     lastCleanup.textContent = retentionStatus.last_cleanup_ts ? formatUnixSeconds(retentionStatus.last_cleanup_ts) : '---';
+  }
+
+  const summarySafe = document.getElementById('settingsSummarySafeMode');
+  if (summarySafe) summarySafe.textContent = data.safe_mode ? 'AÇIK' : 'KAPALI';
+  const summaryAutomation = document.getElementById('settingsSummaryAutomation');
+  if (summaryAutomation) {
+    let text = 'Kapalı';
+    if (auto.enabled) {
+      const overrideRemaining = minutesRemaining(automationState.manual_override_until_ts);
+      const blockRemaining = minutesRemaining(automationState.block_until_ts);
+      if (automationState.lux_paused) {
+        text = 'Pasif (Lux Hatası)';
+      } else if (blockRemaining > 0) {
+        text = `Bloklu (${blockRemaining} dk)`;
+      } else if (overrideRemaining > 0) {
+        text = `Müdahale (${overrideRemaining} dk)`;
+      } else {
+        text = 'Aktif';
+      }
+    }
+    summaryAutomation.textContent = text;
+  }
+  const summaryOverride = document.getElementById('settingsSummaryOverride');
+  if (summaryOverride) {
+    const overrides = [];
+    const luxOverride = minutesRemaining(automationState.manual_override_until_ts);
+    const fanOverride = minutesRemaining(automationState.fan?.manual_override_until_ts);
+    const heaterOverride = minutesRemaining(automationState.heater?.manual_override_until_ts);
+    const pumpOverride = minutesRemaining(automationState.pump?.manual_override_until_ts);
+    if (luxOverride > 0) overrides.push(`Lux ${luxOverride} dk`);
+    if (fanOverride > 0) overrides.push(`Fan ${fanOverride} dk`);
+    if (heaterOverride > 0) overrides.push(`Isıtıcı ${heaterOverride} dk`);
+    if (pumpOverride > 0) overrides.push(`Pompa ${pumpOverride} dk`);
+    summaryOverride.textContent = overrides.length ? overrides.join(' · ') : 'Yok';
+  }
+  const summaryPump = document.getElementById('settingsSummaryPumpUsage');
+  if (summaryPump) {
+    const pumpState = automationState.pump || {};
+    const used = Number(pumpState.daily_used_seconds ?? 0);
+    const max = Number(pumpState.max_daily_seconds ?? auto.pump_max_daily_seconds ?? 0);
+    const usedText = Number.isFinite(used) ? formatDuration(used) : '--';
+    const maxText = max > 0 ? formatDuration(max) : 'Limit yok';
+    summaryPump.textContent = `${usedText} / ${maxText}`;
+  }
+  const summaryNotify = document.getElementById('settingsSummaryNotifications');
+  if (summaryNotify) {
+    let text = 'Kapalı';
+    if (notifCfg.enabled !== false) {
+      text = 'Açık';
+      const telegramEnabled = notifCfg.telegram_enabled === true;
+      const telegramConfigured = !!(notifStatus.runtime && notifStatus.runtime.telegram_configured);
+      if (telegramEnabled) text += ` · ${telegramConfigured ? 'Telegram hazır' : 'Telegram eksik'}`;
+      if (notifCfg.email_enabled === true) text += ' · Email açık';
+    }
+    summaryNotify.textContent = text;
+  }
+  const summaryRetention = document.getElementById('settingsSummaryRetention');
+  if (summaryRetention) {
+    const sensorDays = Number(retentionCfg.sensor_log_days ?? 0);
+    const eventDays = Number(retentionCfg.event_log_days ?? 0);
+    const actuatorDays = Number(retentionCfg.actuator_log_days ?? 0);
+    summaryRetention.textContent = `Sensör ${sensorDays}g · Olay ${eventDays}g · Aktüatör ${actuatorDays}g`;
   }
 };
 
@@ -1818,7 +2447,7 @@ function clearSensorLog() {
   const fromEl = document.getElementById('sensorLogFrom');
   const from = ((fromEl && fromEl.value) || '').trim();
   const scopeLabel = from ? `(${from} öncesi)` : '(tümü)';
-  const ok = window.prompt(`Sensör log temizlenecek ${scopeLabel}. Onay için YES yaz:`);
+  const ok = window.prompt(`Sensör kaydı temizlenecek ${scopeLabel}. Onay için YES yaz:`);
   if (ok !== 'YES') return;
   const payload = { confirm: 'yes' };
   if (from) payload.before = from;
@@ -1828,7 +2457,7 @@ function clearSensorLog() {
     body: JSON.stringify(payload),
   }).then(r => r.json()).then(data => {
     const note = document.getElementById('sensorLogNote');
-    if (note) note.textContent = data.ok ? `Silindi: ${data.deleted ?? 0}` : `Hata: ${data.error || 'unknown'}`;
+    if (note) note.textContent = data.ok ? `Silindi: ${data.deleted ?? 0}` : `Hata: ${data.error || 'bilinmiyor'}`;
     refreshSensorLog();
   });
 }
@@ -1836,6 +2465,8 @@ function clearSensorLog() {
 window.initLogs = function() {
   poll();
   state.poller = setInterval(poll, 4000);
+  if (typeof initHistory === 'function') initHistory();
+  if (typeof initEvents === 'function') initEvents();
   const refreshBtn = document.getElementById('sensorLogRefresh');
   const clearBtn = document.getElementById('sensorLogClear');
   if (refreshBtn) refreshBtn.onclick = refreshSensorLog;
@@ -2095,6 +2726,678 @@ function saveLcd() {
     body: JSON.stringify(payload),
   }).then(r => r.json()).then(() => fetchLcdConfig());
 }
+
+function bindRefreshButton() {
+  const btn = document.getElementById('refreshNow');
+  if (!btn) return;
+  btn.addEventListener('click', () => poll());
+}
+
+function setOverviewNodeFilter(filter) {
+  if (!state.overview) state.overview = { nodeFilter: 'all' };
+  state.overview.nodeFilter = filter;
+  if (state.status && window.renderOverview) window.renderOverview(state.status);
+}
+
+function updateOverviewNodeBadgeSelection(filter) {
+  const isAll = filter === 'all';
+  document.querySelectorAll('[data-node-filter]').forEach(badge => {
+    const match = badge.dataset.nodeFilter === filter;
+    const active = isAll ? badge.dataset.nodeFilter === 'all' : match;
+    badge.classList.toggle('border', active);
+    badge.classList.toggle('border-dark', active);
+    badge.setAttribute('aria-pressed', active ? 'true' : 'false');
+    if (isAll) {
+      badge.classList.remove('opacity-75');
+    } else {
+      badge.classList.toggle('opacity-75', !match);
+    }
+  });
+}
+
+function zoneTrendKey(zoneId, metric) {
+  return `${zoneId || 'unknown'}:${metric || 'metric'}`;
+}
+
+function fetchZoneTrend(zoneId, metric) {
+  if (!zoneId || !metric) return Promise.resolve({ points: [] });
+  const now = Date.now() / 1000;
+  const key = zoneTrendKey(zoneId, metric);
+  if (!state.zoneTrends) state.zoneTrends = {};
+  const existing = state.zoneTrends[key];
+  if (existing && now - existing.lastFetch < ZONE_TREND_REFRESH_SECONDS) {
+    return Promise.resolve(existing.data || { points: [] });
+  }
+  return fetch(`/api/trends?zone=${encodeURIComponent(zoneId)}&metric=${encodeURIComponent(metric)}&hours=${ZONE_TREND_HOURS}&max_points=${ZONE_TREND_MAX_POINTS}`)
+    .then(r => r.json())
+    .then(data => {
+      state.zoneTrends[key] = { lastFetch: now, data };
+      return data;
+    })
+    .catch(() => ({ points: [] }));
+}
+
+function drawZoneSparkline(canvas, points) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const width = canvas.clientWidth || 220;
+  const height = canvas.clientHeight || 60;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(width * dpr);
+  canvas.height = Math.floor(height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+
+  const clean = (points || [])
+    .filter(p => Array.isArray(p) && p.length > 1 && p[1] !== null && !Number.isNaN(Number(p[1])));
+  if (!clean.length) {
+    ctx.strokeStyle = 'rgba(148,163,184,0.4)';
+    ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
+    return;
+  }
+  const sampled = downsamplePoints(clean, ZONE_TREND_MAX_POINTS);
+  let minVal = Number.POSITIVE_INFINITY;
+  let maxVal = Number.NEGATIVE_INFINITY;
+  sampled.forEach(point => {
+    const value = Number(point[1]);
+    if (value < minVal) minVal = value;
+    if (value > maxVal) maxVal = value;
+  });
+  if (minVal === maxVal) {
+    minVal -= 1;
+    maxVal += 1;
+  }
+  ctx.strokeStyle = 'rgba(14,165,164,0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  sampled.forEach((point, idx) => {
+    const ratio = sampled.length > 1 ? idx / (sampled.length - 1) : 0;
+    const value = Number(point[1]);
+    const x = ratio * (width - 4) + 2;
+    const y = height - 2 - ((value - minVal) / (maxVal - minVal)) * (height - 4);
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+function renderZoneSparkline(canvas, zoneId, metric) {
+  if (!canvas || !zoneId || !metric) return;
+  fetchZoneTrend(zoneId, metric).then(data => {
+    const points = Array.isArray(data.points) ? data.points : [];
+    drawZoneSparkline(canvas, points);
+  });
+}
+
+function formatValue(value, unit, digits) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return '--';
+  const num = Number(value);
+  const precision = Number.isFinite(digits) ? digits : 1;
+  const text = precision === 0 ? Math.round(num).toString() : num.toFixed(precision);
+  return `${text}${unit ? ` ${unit}` : ''}`.trim();
+}
+
+function zoneStatusBadge(zoneSensors) {
+  const statuses = zoneSensors.map(s => s && s.status).filter(Boolean);
+  if (!statuses.length) return { text: 'Veri yok', cls: 'text-bg-secondary' };
+  if (statuses.includes('error')) return { text: 'Hata', cls: 'text-bg-danger' };
+  if (statuses.includes('missing')) return { text: 'Eksik', cls: 'text-bg-warning' };
+  if (statuses.includes('disabled')) return { text: 'Kapalı', cls: 'text-bg-secondary' };
+  if (statuses.includes('simulated')) return { text: 'Simülasyon', cls: 'text-bg-info' };
+  return { text: 'OK', cls: 'text-bg-success' };
+}
+
+function findZoneSensor(zoneSensors, matcher) {
+  return zoneSensors.find(sensor => sensor && matcher(sensor));
+}
+
+function pickActuator(zoneActuators, roleKey) {
+  const key = String(roleKey || '').toLowerCase();
+  return zoneActuators.find(act => {
+    const role = String(act?.role || '').toLowerCase();
+    if (!role) return false;
+    if (key === 'fan') return role.startsWith('fan');
+    return role === key;
+  });
+}
+
+function renderZoneCards(container, data, compact) {
+  if (!container) return;
+  container.innerHTML = '';
+  const zones = Array.isArray(data.zones) ? data.zones : [];
+  if (!zones.length) {
+    container.innerHTML = '<div class="col-12 small text-secondary">Katalog tanımlı değil.</div>';
+    return;
+  }
+  const sensorsById = new Map();
+  (data.sensors || []).forEach(sensor => {
+    if (sensor && sensor.id) sensorsById.set(sensor.id, sensor);
+  });
+  const actuatorsById = new Map();
+  (data.actuators || []).forEach(actuator => {
+    if (actuator && actuator.id) actuatorsById.set(actuator.id, actuator);
+  });
+
+  zones.forEach(zone => {
+    const zoneId = typeof zone.id === 'string' ? zone.id : '';
+    const zoneSensors = Array.isArray(zone.sensors)
+      ? zone.sensors.map(id => sensorsById.get(id)).filter(Boolean)
+      : [];
+    const zoneActuators = Array.isArray(zone.actuators)
+      ? zone.actuators.map(id => actuatorsById.get(id)).filter(Boolean)
+      : [];
+    if (!zoneSensors.length) {
+      (data.sensors || []).forEach(sensor => {
+        if (sensor && sensor.zone === zone.id) zoneSensors.push(sensor);
+      });
+    }
+    if (!zoneActuators.length) {
+      (data.actuators || []).forEach(actuator => {
+        if (actuator && actuator.zone === zone.id) zoneActuators.push(actuator);
+      });
+    }
+
+    const tempHumSensor = findZoneSensor(
+      zoneSensors,
+      s => s.purpose === 'temp_hum' || ['dht11', 'dht22', 'sht31'].includes(String(s.kind || '').toLowerCase())
+    );
+    const tempSensor = tempHumSensor || findZoneSensor(zoneSensors, s => s.purpose === 'temp' || s.kind === 'ds18b20');
+    const luxSensor = findZoneSensor(
+      zoneSensors,
+      s => s.purpose === 'lux' || ['bh1750', 'ldr'].includes(String(s.kind || '').toLowerCase())
+    );
+    const soilSensor = findZoneSensor(zoneSensors, s => s.purpose === 'soil' || s.kind === 'ads1115');
+
+    const tempValue = tempSensor?.last_value?.temperature;
+    const humValue = tempHumSensor?.last_value?.humidity;
+    const luxValue = luxSensor?.last_value?.lux;
+    const soilValue = soilSensor?.last_value?.raw;
+
+    const status = zoneStatusBadge(zoneSensors);
+    const label = zone.label || zone.id || 'ZONE';
+    const onCount = zoneActuators.filter(act => act && act.state).length;
+    const totalCount = zoneActuators.length;
+
+    const fan = pickActuator(zoneActuators, 'fan');
+    const heater = pickActuator(zoneActuators, 'heater');
+    const light = pickActuator(zoneActuators, 'light');
+    const pump = pickActuator(zoneActuators, 'pump');
+    const trendMetric = tempSensor ? 'temp_c' : luxSensor ? 'lux' : soilSensor ? 'soil_raw' : null;
+    const trendLabel = trendMetric === 'temp_c'
+      ? 'Sıcaklık'
+      : trendMetric === 'lux'
+        ? 'Lux'
+        : trendMetric === 'soil_raw'
+          ? 'Toprak'
+          : 'Trend';
+    const activeActuators = zoneActuators.filter(act => act && act.state);
+    const activeNames = activeActuators.map(act => act.label || act.description || act.id).filter(Boolean);
+    let activeSummary = 'Yok';
+    if (activeNames.length) {
+      const visible = activeNames.slice(0, 3);
+      const extra = activeNames.length - visible.length;
+      activeSummary = visible.join(', ');
+      if (extra > 0) activeSummary += ` +${extra}`;
+    }
+    const lastAction = zoneActuators
+      .filter(act => act && act.last_change_ts)
+      .sort((a, b) => Number(b.last_change_ts) - Number(a.last_change_ts))[0];
+    const lastActionText = lastAction
+      ? `${lastAction.label || lastAction.description || lastAction.id || '--'} ${lastAction.state ? 'ON' : 'OFF'} · ${formatUnixSeconds(lastAction.last_change_ts)}${lastAction.reason ? ` · ${lastAction.reason}` : ''}`
+      : '--';
+
+    const metrics = [
+      { label: 'Sıcaklık', value: formatValue(tempValue, '°C', 1) },
+      { label: 'Nem', value: formatValue(humValue, '%', 1) },
+      { label: 'Lux', value: formatValue(luxValue, 'lx', 0) },
+    ];
+    if (!compact) {
+      metrics.push({ label: 'Toprak', value: formatValue(soilValue, 'raw', 0) });
+    }
+
+    const card = document.createElement('div');
+    card.className = compact ? 'col-md-6 col-xl-4' : 'col-lg-6';
+    card.innerHTML = `
+      <div class="card h-100">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">${label}</h6>
+            <span class="badge ${status.cls}">${status.text}</span>
+          </div>
+          <div class="row g-2 mb-2">
+            ${metrics
+              .map(metric => `
+                <div class="col-6">
+                  <div class="small text-secondary">${metric.label}</div>
+                  <div class="fw-semibold">${metric.value}</div>
+                </div>
+              `)
+              .join('')}
+          </div>
+          <div class="d-flex flex-wrap gap-2 mb-2">
+            <span class="pill small">Fan: ${fan ? (fan.state ? 'ON' : 'OFF') : '--'}</span>
+            <span class="pill small">Isıtıcı: ${heater ? (heater.state ? 'ON' : 'OFF') : '--'}</span>
+            <span class="pill small">Işık: ${light ? (light.state ? 'ON' : 'OFF') : '--'}</span>
+            <span class="pill small">Pompa: ${pump ? (pump.state ? 'ON' : 'OFF') : '--'}</span>
+          </div>
+          <div class="small text-secondary">Aktif aktüatör: ${onCount}/${totalCount}</div>
+          ${compact ? '' : `<div class="small text-secondary">Aktif: ${activeSummary}</div>`}
+          ${compact ? '' : `<div class="small text-secondary">Son aksiyon: ${lastActionText}</div>`}
+          ${compact ? '' : `
+            <div class="mt-2">
+              <div class="small text-secondary mb-1">Mini trend (${trendLabel}, son ${ZONE_TREND_HOURS} saat)</div>
+              ${trendMetric && zoneId
+                ? `<canvas class="w-100" style="height:64px;" data-zone-trend="${zoneId}" data-metric="${trendMetric}"></canvas>`
+                : '<div class="small text-secondary">Trend verisi yok.</div>'}
+            </div>
+          `}
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+    if (!compact && trendMetric && zoneId) {
+      const canvas = card.querySelector(`canvas[data-zone-trend="${zoneId}"]`);
+      renderZoneSparkline(canvas, zoneId, trendMetric);
+    }
+  });
+}
+
+const OVERVIEW_SUMMARY_METRICS = [
+  { key: 'temp_c', label: 'Sıcaklık', unit: '°C', digits: 1 },
+  { key: 'rh_pct', label: 'Nem', unit: '%', digits: 1 },
+  { key: 'lux', label: 'Lux', unit: 'lx', digits: 0 },
+  { key: 'soil_raw', label: 'Toprak', unit: 'raw', digits: 0 },
+];
+
+function fetchOverviewSummary(force) {
+  if (!state.overview) state.overview = { nodeFilter: 'all', summaryRange: OVERVIEW_SUMMARY_HOURS, summaryCache: {} };
+  const hours = state.overview.summaryRange || OVERVIEW_SUMMARY_HOURS;
+  const zone = state.overview.summaryZone || '';
+  if (!state.overview.summaryCache) state.overview.summaryCache = {};
+  const cache = state.overview.summaryCache;
+  const now = Date.now() / 1000;
+  const cacheKey = `${zone || 'sera'}:${hours}`;
+  const cached = cache[cacheKey];
+  if (!force && cached && now - cached.lastFetch < OVERVIEW_SUMMARY_REFRESH_SECONDS) {
+    renderOverviewSummary();
+    return;
+  }
+  const requests = OVERVIEW_SUMMARY_METRICS.map(meta => {
+    const params = new URLSearchParams({
+      metric: meta.key,
+      hours: String(hours),
+      summary: '1',
+    });
+    if (state.overview?.summaryZone) {
+      params.set('zone', state.overview.summaryZone);
+    }
+    return fetch(`/api/trends?${params.toString()}`)
+      .then(r => r.json())
+      .catch(() => ({ metric: meta.key, count: 0 }));
+  });
+  Promise.all(requests).then(results => {
+    const summary = {};
+    results.forEach(item => {
+      if (item && item.metric) summary[item.metric] = item;
+    });
+    cache[cacheKey] = {
+      data: summary,
+      lastFetch: now,
+      updatedAt: Date.now(),
+    };
+    renderOverviewSummary();
+  });
+}
+
+function renderOverviewSummary() {
+  const grid = document.getElementById('overviewSummaryGrid');
+  if (!grid) return;
+  const hours = state.overview?.summaryRange || OVERVIEW_SUMMARY_HOURS;
+  const zone = state.overview?.summaryZone || '';
+  const label = document.getElementById('overviewSummaryRangeLabel');
+  if (label) {
+    const meta = OVERVIEW_SUMMARY_RANGES[hours];
+    label.textContent = meta ? meta.label : `Son ${hours} saat`;
+  }
+  const cache = state.overview?.summaryCache || {};
+  const cacheKey = `${zone || 'sera'}:${hours}`;
+  const cached = cache[cacheKey];
+  const updated = document.getElementById('overviewSummaryUpdated');
+  if (updated) {
+    updated.textContent = cached && cached.updatedAt
+      ? `Güncelleme: ${new Date(cached.updatedAt).toLocaleTimeString()}`
+      : '--';
+  }
+  const summary = cached?.data || {};
+  if (!cached) {
+    grid.innerHTML = '<div class="small text-secondary">Özet yükleniyor...</div>';
+    return;
+  }
+  grid.innerHTML = '';
+  OVERVIEW_SUMMARY_METRICS.forEach(meta => {
+    const item = summary[meta.key] || {};
+    const minText = formatValue(item.min, meta.unit, meta.digits);
+    const maxText = formatValue(item.max, meta.unit, meta.digits);
+    const lastText = formatValue(item.last, meta.unit, meta.digits);
+    const lastTs = item.last_ts ? formatUnixSeconds(item.last_ts) : '--';
+    const count = Number(item.count || 0);
+    const sourceLabel = item.source === 'telemetry'
+      ? 'Telemetri'
+      : item.source === 'sensor_log'
+        ? 'Kayıt'
+        : '--';
+    const col = document.createElement('div');
+    col.className = 'col-md-3 col-6';
+    col.innerHTML = `
+      <div class="small text-secondary">${meta.label}</div>
+      <div class="fw-semibold">${lastText}</div>
+      <div class="small text-secondary">Min ${minText} · Max ${maxText}</div>
+      <div class="small text-secondary">Son ${lastTs} · Örnek ${count}</div>
+      <div class="small text-secondary">Kaynak: ${sourceLabel}</div>
+    `;
+    grid.appendChild(col);
+  });
+  updateOverviewSummaryCsvLink();
+}
+
+function updateOverviewSummaryRangeButtons() {
+  const current = state.overview?.summaryRange || OVERVIEW_SUMMARY_HOURS;
+  document.querySelectorAll('[data-summary-range]').forEach(btn => {
+    const value = parseInt(btn.dataset.summaryRange || '0', 10);
+    const active = value === current;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+function updateOverviewSummaryZoneSelect() {
+  const select = document.getElementById('overviewSummaryZone');
+  if (!select) return;
+  const zones = Array.isArray(state.status && state.status.zones) ? state.status.zones : [];
+  const key = zones
+    .map(zone => `${zone?.id || ''}:${zone?.label || ''}`)
+    .join('|');
+  if (state.overview?.summaryZoneKey === key && select.options.length) return;
+  const current = state.overview?.summaryZone || select.value || '';
+  select.innerHTML = '';
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = 'Genel (SERA)';
+  select.appendChild(defaultOption);
+  zones.forEach(zone => {
+    if (!zone || !zone.id) return;
+    const option = document.createElement('option');
+    option.value = zone.id;
+    option.textContent = zone.label || zone.id;
+    select.appendChild(option);
+  });
+  const hasCurrent = Array.from(select.options).some(opt => opt.value === current);
+  select.value = hasCurrent ? current : '';
+  if (!state.overview) state.overview = { nodeFilter: 'all', summaryRange: OVERVIEW_SUMMARY_HOURS, summaryCache: {} };
+  state.overview.summaryZone = select.value || '';
+  state.overview.summaryZoneKey = key;
+  updateOverviewSummaryCsvLink();
+}
+
+function updateOverviewSummaryCsvLink() {
+  const link = document.getElementById('overviewSummaryCsvLink');
+  const metricSelect = document.getElementById('overviewSummaryCsvMetric');
+  if (!link || !metricSelect) return;
+  const metric = metricSelect.value || 'temp_c';
+  const hours = state.overview?.summaryRange || OVERVIEW_SUMMARY_HOURS;
+  const params = new URLSearchParams({
+    metric,
+    hours: String(hours),
+    format: 'csv',
+  });
+  if (state.overview?.summaryZone) params.set('zone', state.overview.summaryZone);
+  link.href = `/api/trends?${params.toString()}`;
+}
+
+function setOverviewSummaryRange(hours) {
+  const value = Number(hours);
+  if (!Number.isFinite(value) || !OVERVIEW_SUMMARY_RANGES[value]) return;
+  if (!state.overview) state.overview = { nodeFilter: 'all', summaryRange: value, summaryCache: {} };
+  state.overview.summaryRange = value;
+  updateOverviewSummaryRangeButtons();
+  updateOverviewSummaryCsvLink();
+  fetchOverviewSummary(true);
+}
+
+window.initOverview = function() {
+  bindRefreshButton();
+  fetchOverviewSummary(true);
+  updateOverviewSummaryRangeButtons();
+  updateOverviewSummaryZoneSelect();
+  updateOverviewSummaryCsvLink();
+  const zoneSelect = document.getElementById('overviewSummaryZone');
+  if (zoneSelect) {
+    zoneSelect.addEventListener('change', () => {
+      state.overview.summaryZone = zoneSelect.value || '';
+      fetchOverviewSummary(true);
+    });
+  }
+  const csvMetric = document.getElementById('overviewSummaryCsvMetric');
+  if (csvMetric) {
+    csvMetric.addEventListener('change', () => {
+      updateOverviewSummaryCsvLink();
+    });
+  }
+  document.querySelectorAll('[data-summary-range]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const hours = parseInt(btn.dataset.summaryRange || '', 10);
+      if (!Number.isFinite(hours)) return;
+      setOverviewSummaryRange(hours);
+    });
+  });
+  document.querySelectorAll('[data-node-filter]').forEach(badge => {
+    const handleNodeFilter = () => {
+      const filter = badge.dataset.nodeFilter || 'all';
+      const current = state.overview?.nodeFilter || 'all';
+      const next = filter === current ? 'all' : filter;
+      setOverviewNodeFilter(next);
+    };
+    badge.addEventListener('click', handleNodeFilter);
+    badge.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        handleNodeFilter();
+      }
+    });
+  });
+  poll();
+  state.poller = setInterval(poll, 2500);
+};
+
+window.initZones = function() {
+  bindRefreshButton();
+  poll();
+  state.poller = setInterval(poll, 2500);
+};
+
+window.renderOverview = function(data) {
+  const safeEl = document.getElementById('overviewSafeMode');
+  if (!safeEl) return;
+  const safeOn = !!data.safe_mode;
+  safeEl.textContent = safeOn ? 'AÇIK' : 'KAPALI';
+  safeEl.className = `pill small ${safeOn ? 'text-danger' : 'text-success'}`;
+
+  const dataAgeEl = document.getElementById('overviewDataAge');
+  if (dataAgeEl) dataAgeEl.textContent = formatAge(data.data_age_sec);
+
+  const alertsCount = (data.alerts || []).length;
+  const alertCountEl = document.getElementById('overviewAlertsCount');
+  if (alertCountEl) {
+    alertCountEl.textContent = `${alertsCount}`;
+    alertCountEl.className = `pill small ${alertsCount ? 'text-danger' : ''}`;
+  }
+
+  const lastUpdateEl = document.getElementById('overviewLastUpdate');
+  if (lastUpdateEl) lastUpdateEl.textContent = formatDate(data.timestamp);
+
+  const automationState = data.automation_state || {};
+  const manualRemaining = minutesRemaining(automationState.manual_override_until_ts);
+  const blockRemaining = minutesRemaining(automationState.block_until_ts);
+  const automationLabel = (() => {
+    if (!automationState.enabled) return 'Kapalı';
+    if (automationState.lux_paused) return 'Pasif (Lux Hatası)';
+    if (manualRemaining > 0) return 'Manuel Müdahale';
+    if (blockRemaining > 0) return 'Bloklu';
+    return 'Aktif';
+  })();
+  const automationEl = document.getElementById('overviewAutomationState');
+  if (automationEl) automationEl.textContent = automationLabel;
+
+  const overrideEl = document.getElementById('overviewAutomationOverride');
+  if (overrideEl) overrideEl.textContent = manualRemaining > 0 ? `${manualRemaining} dk` : 'Yok';
+
+  const automationList = document.getElementById('overviewAutomationList');
+  if (automationList) {
+    const listItems = [];
+    const luxEnabled = !!automationState.enabled;
+    let luxState = luxEnabled ? 'Açık' : 'Kapalı';
+    if (luxEnabled && automationState.lux_paused) luxState = 'Pasif (Lux Hatası)';
+    if (luxEnabled && automationState.target_reached) luxState = 'Hedef Tamam';
+    const luxOverride = minutesRemaining(automationState.manual_override_until_ts);
+    const luxBlock = minutesRemaining(automationState.block_until_ts);
+    const luxExtras = [];
+    if (luxOverride > 0) luxExtras.push(`Müdahale ${luxOverride} dk`);
+    if (luxBlock > 0) luxExtras.push(`Blok ${luxBlock} dk`);
+    if (luxExtras.length) luxState += ` · ${luxExtras.join(' · ')}`;
+    listItems.push({ label: 'Lux', value: luxState });
+
+    const fan = automationState.fan || {};
+    let fanState = fan.enabled ? 'Açık' : 'Kapalı';
+    const fanOverride = minutesRemaining(fan.manual_override_until_ts);
+    if (fanOverride > 0) fanState += ` · Müdahale ${fanOverride} dk`;
+    listItems.push({ label: 'Fan', value: fanState });
+
+    const heater = automationState.heater || {};
+    let heaterState = heater.enabled ? 'Açık' : 'Kapalı';
+    const heaterOverride = minutesRemaining(heater.manual_override_until_ts);
+    if (heaterOverride > 0) heaterState += ` · Müdahale ${heaterOverride} dk`;
+    listItems.push({ label: 'Isıtıcı', value: heaterState });
+
+    const pump = automationState.pump || {};
+    let pumpState = pump.enabled ? 'Açık' : 'Kapalı';
+    const pumpOverride = minutesRemaining(pump.manual_override_until_ts);
+    const pumpBlock = minutesRemaining(pump.block_until_ts);
+    const pumpExtras = [];
+    if (pumpOverride > 0) pumpExtras.push(`Müdahale ${pumpOverride} dk`);
+    if (pumpBlock > 0) pumpExtras.push(`Blok ${pumpBlock} dk`);
+    if (pumpExtras.length) pumpState += ` · ${pumpExtras.join(' · ')}`;
+    listItems.push({ label: 'Pompa', value: pumpState });
+
+    automationList.innerHTML = listItems
+      .map(item => `<div class="d-flex justify-content-between"><span>${item.label}</span><span>${item.value}</span></div>`)
+      .join('');
+  }
+
+  const catalog = data.catalog || {};
+  const catalogEl = document.getElementById('overviewCatalogMeta');
+  if (catalogEl) {
+    const source = String(catalog.source || 'legacy');
+    const sourceLabel = source === 'legacy'
+      ? 'Eski'
+      : source === 'catalog'
+        ? 'Katalog'
+        : source;
+    const version = catalog.version || 0;
+    catalogEl.textContent = `${sourceLabel} · v${version}`;
+  }
+
+  const staleEl = document.getElementById('overviewStaleThreshold');
+  if (staleEl) staleEl.textContent = `${data.stale_threshold_sec ?? '--'} sn`;
+
+  const alertBox = document.getElementById('overviewAlerts');
+  if (alertBox) {
+    const items = (data.alerts || []).slice(-5);
+    if (!items.length) {
+      alertBox.textContent = 'Henüz uyarı yok.';
+    } else {
+      alertBox.innerHTML = '';
+      items.forEach(alert => {
+        const div = document.createElement('div');
+        div.textContent = `[${alert.severity}] ${formatDate(alert.ts)} ${alert.message}`;
+        alertBox.appendChild(div);
+      });
+    }
+  }
+
+  const nodesBox = document.getElementById('overviewNodes');
+  if (nodesBox) {
+    const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+    const counts = { ok: 0, missing: 0, error: 0, unknown: 0, camera: 0 };
+    nodes.forEach(node => {
+      const status = node?.health?.status || 'unknown';
+      if (counts[status] !== undefined) {
+        counts[status] += 1;
+      } else {
+        counts.unknown += 1;
+      }
+      const capabilities = node?.capabilities || node?.status?.capabilities || {};
+      const hasCamera = !!(capabilities.camera || node?.status?.camera);
+      if (hasCamera) counts.camera += 1;
+    });
+    const okBadge = document.getElementById('overviewNodesOk');
+    if (okBadge) okBadge.textContent = `OK: ${counts.ok}`;
+    const cameraBadge = document.getElementById('overviewNodesCamera');
+    if (cameraBadge) cameraBadge.textContent = `Kamera: ${counts.camera}`;
+    const allBadge = document.getElementById('overviewNodesAll');
+    if (allBadge) allBadge.textContent = `Tümü: ${nodes.length}`;
+    const missingBadge = document.getElementById('overviewNodesMissing');
+    if (missingBadge) missingBadge.textContent = `Eksik: ${counts.missing}`;
+    const errorBadge = document.getElementById('overviewNodesError');
+    if (errorBadge) errorBadge.textContent = `Hata: ${counts.error}`;
+    const unknownBadge = document.getElementById('overviewNodesUnknown');
+    if (unknownBadge) unknownBadge.textContent = `Bilinmiyor: ${counts.unknown}`;
+    const filter = state.overview?.nodeFilter || 'all';
+    updateOverviewNodeBadgeSelection(filter);
+    if (!nodes.length) {
+      nodesBox.textContent = 'Node verisi yok.';
+    } else {
+      nodesBox.innerHTML = '';
+      const listNodes = filter === 'all'
+        ? nodes
+        : filter === 'camera'
+          ? nodes.filter(node => {
+            const capabilities = node?.capabilities || node?.status?.capabilities || {};
+            return !!(capabilities.camera || node?.status?.camera);
+          })
+          : nodes.filter(node => (node?.health?.status || 'unknown') === filter);
+      if (!listNodes.length) {
+        nodesBox.textContent = 'Filtreye uyan node yok.';
+        return;
+      }
+      listNodes.forEach(node => {
+        const health = node.health || {};
+        const age = health.data_age_sec != null ? `${health.data_age_sec.toFixed(1)} sn` : '--';
+        const ip = node.last_ip ? ` · ${node.last_ip}` : '';
+        const fw = node.status?.fw ? ` · sürüm ${node.status.fw}` : '';
+        const snapshot = node.status?.last_snapshot_ts
+          ? ` · görüntü ${formatUnixSeconds(node.status.last_snapshot_ts)}`
+          : '';
+        const capabilities = node?.capabilities || node?.status?.capabilities || {};
+        const hasCamera = !!(capabilities.camera || node?.status?.camera);
+        const camera = hasCamera ? ' · kamera' : '';
+        const line = document.createElement('div');
+        line.textContent = `${node.node_id || node.id || 'node'} · ${nodeStatusLabel(health.status)} · ${age} · kuyruk ${node.queue_size ?? 0}${ip}${fw}${snapshot}${camera}`;
+        nodesBox.appendChild(line);
+      });
+    }
+  }
+
+  renderZoneCards(document.getElementById('overviewZones'), data, true);
+  updateOverviewSummaryZoneSelect();
+  fetchOverviewSummary(false);
+  renderOverviewSummary();
+};
+
+window.renderZones = function(data) {
+  const grid = document.getElementById('zonesGrid');
+  if (!grid) return;
+  renderZoneCards(grid, data, false);
+};
 
 window.addEventListener('beforeunload', () => {
   if (state.poller) clearInterval(state.poller);

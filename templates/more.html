@@ -1,0 +1,73 @@
+{% extends 'base_v1.html' %}
+{% block content %}
+<div class="hero p-3 rounded-4 mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <p class="text-secondary mb-1">Diğer</p>
+      <h2 class="mb-0">Ek Sayfalar</h2>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <h6 class="mb-1">Hızlı erişim</h6>
+  <div class="small text-secondary">
+    Ayarlar, raporlar, güncellemeler, yardım ve cihaz araçları burada toplandı.
+  </div>
+</div></div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="card-title mb-1">Ayarlar</h6>
+      <div class="small text-secondary mb-2">SAFE MODE, otomasyon ve limit ayarları.</div>
+      <a class="btn btn-outline-secondary btn-sm" href="/settings">Aç</a>
+    </div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="card-title mb-1">Raporlar</h6>
+      <div class="small text-secondary mb-2">Günlük/haftalık özetler ve CSV dışa aktarımı.</div>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-secondary btn-sm" href="/reports/daily">Günlük</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/reports/weekly">Haftalık</a>
+      </div>
+    </div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="card-title mb-1">Güncellemeler</h6>
+      <div class="small text-secondary mb-2">Her güncellemeden sonra kullanıcı dostu özet.</div>
+      <a class="btn btn-outline-secondary btn-sm" href="/updates">Görüntüle</a>
+    </div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="card-title mb-1">Yardım / SSS</h6>
+      <div class="small text-secondary mb-2">SSS, ipuçları ve sorun giderme notları.</div>
+      <a class="btn btn-outline-secondary btn-sm" href="/help">Görüntüle</a>
+    </div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="card-title mb-1">Donanım</h6>
+      <div class="small text-secondary mb-2">Pin mapping, rol ve kanal ayarları.</div>
+      <a class="btn btn-outline-secondary btn-sm" href="/hardware">Aç</a>
+    </div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="card-title mb-1">LCD</h6>
+      <div class="small text-secondary mb-2">LCD şablonu, önizleme ve ayarlar.</div>
+      <a class="btn btn-outline-secondary btn-sm" href="/lcd">Aç</a>
+    </div></div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100"><div class="card-body">
+      <h6 class="card-title mb-1">Notlar</h6>
+      <div class="small text-secondary mb-2">İç iyileştirme listesi.</div>
+      <a class="btn btn-outline-secondary btn-sm" href="/notes">Aç</a>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

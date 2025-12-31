@@ -1,0 +1,17 @@
+[Unit]
+Description=Sera Panel (legacy/test UI)
+After=network.target
+
+[Service]
+Type=simple
+User=sahin
+WorkingDirectory=/home/sahin/sera_panel
+ExecStart=/usr/bin/python3 /home/sahin/sera_panel/app_legacy.py
+Environment=PYTHONUNBUFFERED=1
+# Optional: set admin token for protected endpoints
+# Environment=ADMIN_TOKEN=change-me
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
